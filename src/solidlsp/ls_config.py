@@ -60,6 +60,11 @@ class Language(str, Enum):
     JULIA = "julia"
     FORTRAN = "fortran"
     HASKELL = "haskell"
+    SOLIDITY = "solidity"
+    VYPER = "vyper"
+    MOVE = "move"
+    SUI_MOVE = "sui_move"
+    CAIRO = "cairo"
     # Experimental or deprecated Language Servers
     TYPESCRIPT_VTS = "typescript_vts"
     """Use the typescript language server through the natively bundled vscode extension via https://github.com/yioneko/vtsls"""
@@ -166,6 +171,14 @@ class Language(str, Enum):
                 )
             case self.HASKELL:
                 return FilenameMatcher("*.hs", "*.lhs")
+            case self.SOLIDITY:
+                return FilenameMatcher("*.sol")
+            case self.VYPER:
+                return FilenameMatcher("*.vy")
+            case self.MOVE | self.SUI_MOVE:
+                return FilenameMatcher("*.move")
+            case self.CAIRO:
+                return FilenameMatcher("*.cairo")
             case _:
                 raise ValueError(f"Unhandled language: {self}")
 
@@ -307,6 +320,26 @@ class Language(str, Enum):
                 from solidlsp.language_servers.haskell_language_server import HaskellLanguageServer
 
                 return HaskellLanguageServer
+            case self.SOLIDITY:
+                from solidlsp.language_servers.solidity_ls import SolidityLanguageServer
+
+                return SolidityLanguageServer
+            case self.VYPER:
+                from solidlsp.language_servers.vyper_ls import VyperLanguageServer
+
+                return VyperLanguageServer
+            case self.MOVE:
+                from solidlsp.language_servers.move_analyzer import MoveAnalyzer
+
+                return MoveAnalyzer
+            case self.SUI_MOVE:
+                from solidlsp.language_servers.sui_move_analyzer import SuiMoveAnalyzer
+
+                return SuiMoveAnalyzer
+            case self.CAIRO:
+                from solidlsp.language_servers.cairo_ls import CairoLanguageServer
+
+                return CairoLanguageServer
             case _:
                 raise ValueError(f"Unhandled language: {self}")
 
