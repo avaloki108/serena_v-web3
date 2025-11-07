@@ -65,7 +65,7 @@ class SuiMoveAnalyzer(SolidLanguageServer):
                 )
                 if result.returncode == 0:
                     return ["sui", "move-analyzer"]
-            except:
+            except (subprocess.SubprocessError, FileNotFoundError, OSError):
                 pass
 
         # Alternative: look in ~/.sui/bin

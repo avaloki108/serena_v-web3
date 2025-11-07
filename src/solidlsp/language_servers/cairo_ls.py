@@ -75,7 +75,7 @@ class CairoLanguageServer(SolidLanguageServer):
                 )
                 if result.returncode == 0:
                     return ["scarb", "cairo-language-server"]
-            except:
+            except (subprocess.SubprocessError, FileNotFoundError, OSError):
                 pass
 
         # Alternative: look in ~/.cairo/bin

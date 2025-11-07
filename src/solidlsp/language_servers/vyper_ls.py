@@ -67,7 +67,7 @@ class VyperLanguageServer(SolidLanguageServer):
                 )
                 if result.returncode == 0:
                     return [python_path, "-m", "vyper_lsp"]
-            except:
+            except (subprocess.SubprocessError, FileNotFoundError, OSError):
                 pass
 
         return None

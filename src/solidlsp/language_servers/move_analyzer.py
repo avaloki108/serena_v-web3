@@ -120,7 +120,7 @@ class MoveAnalyzer(SolidLanguageServer):
             config,
             logger,
             repository_root_path,
-            ProcessLaunchInfo(cmd=analyzer_path, cwd=repository_root_path),
+            ProcessLaunchInfo(cmd=[analyzer_path], cwd=repository_root_path),
             "move",
             solidlsp_settings,
         )
