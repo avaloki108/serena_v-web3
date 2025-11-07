@@ -148,7 +148,8 @@ class AnalyzeSmartContractTool(Tool):
         if version_match:
             version_str = version_match.group(1).strip()
             # Versions before 0.8.0 don't have built-in overflow protection
-            if re.match(r"[\^~]?0\.[0-7]\.", version_str) or re.match(r"[\^~]?0\.8\.0", version_str):
+            # Match exactly 0.8.0, not 0.8.1+
+            if re.match(r"[\^~]?0\.[0-7]\.", version_str) or re.match(r"[\^~]?0\.8\.0(?:[^\d]|$)", version_str):
                 # Look for arithmetic operations
                 lines = content.split("\n")
                 for i, line in enumerate(lines, 1):
@@ -173,10 +174,14 @@ class AnalyzeSmartContractTool(Tool):
         for i, line in enumerate(lines, 1):
             # Look for public/external functions without modifiers
             if re.search(r"function\s+\w+\s*\([^)]*\)\s+(public|external)", line):
-                # Check if function has modifiers
+                # Check if function has modifiers - search in surrounding lines (as string)
+                # Get surrounding context (2 lines before to 2 lines after)
+                start_idx = max(0, i - 2)
+                end_idx = min(len(lines), i + 3)
+                surrounding_context = "\n".join(lines[start_idx:end_idx])
                 has_modifier = bool(
                     re.search(
-                        r"(onlyOwner|onlyRole|requiresAuth|nonReentrant|whenNotPaused|modifier)", lines[i - 1 : i + 3]
+                        r"(onlyOwner|onlyRole|requiresAuth|nonReentrant|whenNotPaused|modifier)", surrounding_context
                     )
                 )
 
@@ -241,8 +246,11 @@ class AnalyzeSmartContractTool(Tool):
 
         for i, line in enumerate(lines, 1):
             if re.search(r"block\.(timestamp|number)", line):
-                # Check if used in critical logic
-                if re.search(r"(require|if|assert)", lines[max(0, i - 2) : i + 1]):
+                # Check if used in critical logic - search in surrounding lines (as string)
+                start_idx = max(0, i - 3)
+                end_idx = min(len(lines), i + 1)
+                surrounding_context = "\n".join(lines[start_idx:end_idx])
+                if re.search(r"(require|if|assert)", surrounding_context):
                     vulnerabilities.append(
                         {
                             "type": "timestamp_dependence",
@@ -568,18 +576,22 @@ class CheckDeFiProtocolTool(Tool):
             )
 
         # Check for collateral factor
-        collateral_match = re.search(r"collateral.*factor[\"']?\s*[:=]\s*([0-9.]+)", content, re.IGNORECASE)
+        collateral_match = re.search(r"collateral.*factor[\"']?\s*[:=]\s*([0-9]+(?:\.[0-9]+)?)", content, re.IGNORECASE)
         if collateral_match:
-            collateral_factor = float(collateral_match.group(1))
-            if collateral_factor > 0.9:
-                findings.append(
-                    {
-                        "type": "high_collateral_factor",
-                        "severity": "medium",
-                        "description": f"High collateral factor: {collateral_factor}",
-                        "recommendation": "Consider lower collateral factor to reduce liquidation risk",
-                    }
-                )
+            try:
+                collateral_factor = float(collateral_match.group(1))
+                if collateral_factor > 0.9:
+                    findings.append(
+                        {
+                            "type": "high_collateral_factor",
+                            "severity": "medium",
+                            "description": f"High collateral factor: {collateral_factor}",
+                            "recommendation": "Consider lower collateral factor to reduce liquidation risk",
+                        }
+                    )
+            except ValueError:
+                # Skip if unable to parse as float
+                pass
 
         return findings
 
@@ -629,18 +641,22 @@ class CheckDeFiProtocolTool(Tool):
         # Check for reward rate
         if "reward" in content.lower():
             # Check for unrealistic reward rates
-            reward_match = re.search(r"reward.*rate[\"']?\s*[:=]\s*([0-9.]+)", content, re.IGNORECASE)
+            reward_match = re.search(r"reward.*rate[\"']?\s*[:=]\s*([0-9]+(?:\.[0-9]+)?)", content, re.IGNORECASE)
             if reward_match:
-                reward_rate = float(reward_match.group(1))
-                if reward_rate > 100:  # >100% APY might be suspicious
-                    findings.append(
-                        {
-                            "type": "high_reward_rate",
-                            "severity": "high",
-                            "description": f"Suspicious reward rate: {reward_rate}%",
-                            "recommendation": "Verify reward rate sustainability",
-                        }
-                    )
+                try:
+                    reward_rate = float(reward_match.group(1))
+                    if reward_rate > 100:  # >100% APY might be suspicious
+                        findings.append(
+                            {
+                                    "type": "high_reward_rate",
+                                "severity": "high",
+                                "description": f"Suspicious reward rate: {reward_rate}%",
+                                "recommendation": "Verify reward rate sustainability",
+                            }
+                        )
+                except ValueError:
+                    # Skip if unable to parse as float
+                    pass
 
         return findings
 

@@ -434,8 +434,8 @@ class TestWeb3ThreatIntelligenceTool:
         agent, _ = agent_with_temp_project
         tool = Web3ThreatIntelligenceTool(agent)
 
-        # Vanity address with many leading zeros
-        vanity_address = "0x" + "0" * 10 + "a" * 30
+        # Vanity address with many leading zeros (0x + 40 hex chars = 42 total)
+        vanity_address = f'0x{"0" * 10}{"a" * 30}'
 
         result_json = tool.apply(vanity_address)
         result = json.loads(result_json)
