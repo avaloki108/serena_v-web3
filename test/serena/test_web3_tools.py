@@ -10,7 +10,7 @@ import pytest
 
 from serena.agent import SerenaAgent
 from serena.tools.web3_tools import (
-    AnalyzeDeFiProtocolTool,
+    CheckDeFiProtocolTool,
     AnalyzeSmartContractTool,
     AnalyzeTransactionTool,
     Web3ThreatIntelligenceTool,
@@ -321,7 +321,7 @@ class TestCheckDeFiProtocolTool:
     def test_check_lending_protocol(self, agent_with_temp_project):
         """Test lending protocol security checks."""
         agent, project_path = agent_with_temp_project
-        tool = AnalyzeDeFiProtocolTool(agent)
+        tool = CheckDeFiProtocolTool(agent)
 
         config_content = """
 {
@@ -345,7 +345,7 @@ class TestCheckDeFiProtocolTool:
     def test_check_dex_protocol(self, agent_with_temp_project):
         """Test DEX protocol security checks."""
         agent, project_path = agent_with_temp_project
-        tool = AnalyzeDeFiProtocolTool(agent)
+        tool = CheckDeFiProtocolTool(agent)
 
         config_content = """
 {
@@ -365,7 +365,7 @@ class TestCheckDeFiProtocolTool:
     def test_check_staking_protocol(self, agent_with_temp_project):
         """Test staking protocol security checks."""
         agent, project_path = agent_with_temp_project
-        tool = AnalyzeDeFiProtocolTool(agent)
+        tool = CheckDeFiProtocolTool(agent)
 
         config_content = """
 {
@@ -385,7 +385,7 @@ class TestCheckDeFiProtocolTool:
     def test_check_common_defi_issues(self, agent_with_temp_project):
         """Test common DeFi security issues detection."""
         agent, project_path = agent_with_temp_project
-        tool = AnalyzeDeFiProtocolTool(agent)
+        tool = CheckDeFiProtocolTool(agent)
 
         config_content = """
 {
