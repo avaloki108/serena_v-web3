@@ -106,6 +106,18 @@ With Serena, we provide direct, out-of-the-box support for:
   * AL
   * Markdown (must be explicitly specified via `--language markdown` when generating project config, primarily useful for documentation-heavy projects)
 
+#### Web3/Blockchain Language Support
+
+Serena also provides native support for Web3 and blockchain programming languages:
+
+  * **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
+  * **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
+  * **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
+  * **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
+  * **Cairo** (Starknet smart contracts; requires Scarb toolchain)
+
+See [Web3 Language Support Documentation](docs/web3_languages.md) for detailed setup instructions and usage examples.
+
 Support for further languages can easily be added by providing a shallow adapter for a new language server implementation,
 see Serena's [memory on that](.serena/memories/adding_new_language_support_guide.md).
 
