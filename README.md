@@ -6,6 +6,7 @@
 * :rocket: Serena is a powerful **coding agent toolkit** capable of turning an LLM into a fully-featured agent that works **directly on your codebase**.
   Unlike most other tools, it is not tied to an LLM, framework or an interface, making it easy to use it in a variety of ways.
 * :wrench: Serena provides essential **semantic code retrieval and editing tools** that are akin to an IDE's capabilities, extracting code entities at the symbol level and exploiting relational structure. When combined with an existing coding agent, these tools greatly enhance (token) efficiency.
+* :shield: Serena now includes **Web3 vulnerability hunting capabilities** for smart contract analysis, blockchain transaction inspection, and DeFi protocol security assessment. See [Web3 Security Documentation](docs/web3_security.md) for details.
 * :free: Serena is **free & open-source**, enhancing the capabilities of LLMs you already have access to free of charge.
 
 You can think of Serena as providing IDE-like tools to your LLM/coding agent. With it, the agent no longer needs to read entire
@@ -881,6 +882,17 @@ Here is the list of Serena's default tools with a short description (output of `
 * `think_about_task_adherence`: Thinking tool for determining whether the agent is still on track with the current task.
 * `think_about_whether_you_are_done`: Thinking tool for determining whether the task is truly completed.
 * `write_memory`: Writes a named memory (for future reference) to Serena's project-specific memory store.
+
+### Web3 Security Tools
+
+Serena includes specialized tools for Web3 vulnerability hunting and security analysis:
+
+* `analyze_smart_contract`: Analyzes smart contract code for common vulnerabilities including reentrancy, overflow, unprotected functions, and more.
+* `analyze_transaction`: Analyzes blockchain transactions for suspicious patterns, MEV, flash loan attacks, and security concerns.
+* `check_defi_protocol`: Checks DeFi protocol configurations for security issues and best practices.
+* `web3_threat_intelligence`: Integrates with Web3 threat intelligence sources to check addresses and contracts against known threats.
+
+See [Web3 Security Documentation](docs/web3_security.md) for detailed usage examples and configuration options.
 
 There are several tools that are disabled by default, and have to be enabled explicitly, e.g., through the context or modes.
 Note that several of our default contexts do enable some of these tools. For example, the `desktop-app` context enables the `execute_shell_command` tool.
