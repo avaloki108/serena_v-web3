@@ -68,6 +68,67 @@ complex projects! So not only is it free and open-source, it frequently achieves
 than existing solutions that charge a premium.
 
 Language servers provide support for a wide range of programming languages.
+With Serena, we provide direct, out-of-the-box support for:
+
+  * Python
+  * TypeScript/Javascript
+  * PHP (uses Intelephense LSP; set `INTELEPHENSE_LICENSE_KEY` environment variable for premium features)
+  * Go (requires installation of gopls)
+  * R (requires installation of the `languageserver` R package)
+  * Rust (requires [rustup](https://rustup.rs/) - uses rust-analyzer from your toolchain)
+  * C/C++ (you may experience issues with finding references, we are working on it)
+  * Zig (requires installation of ZLS - Zig Language Server)
+  * C#
+  * Ruby (by default, uses [ruby-lsp](https://github.com/Shopify/ruby-lsp), specify ruby_solargraph as your language to use the previous solargraph based implementation)
+  * Swift
+  * Kotlin (uses the pre-alpha [official kotlin LS](https://github.com/Kotlin/kotlin-lsp), some issues may appear)
+  * Java (_Note_: startup is slow, initial startup especially so. There may be issues with java on macos and linux, we are working on it.)
+  * Clojure
+  * Dart
+  * Bash
+  * Lua (automatically downloads lua-language-server if not installed)
+  * Nix (requires nixd installation)
+  * Elixir (requires installation of NextLS and Elixir; **Windows not supported**)
+  * Elm (automatically downloads elm-language-server if not installed; requires Elm compiler)
+  * Scala (requires some [manual setup](docs/scala_setup_guide_for_serena.md); uses Metals LSP)
+  * Erlang (requires installation of beam and [erlang_ls](https://github.com/erlang-ls/erlang_ls), experimental, might be slow or hang)
+  * Perl (requires installation of Perl::LanguageServer)
+  * Fortran (requires installation of fortls: `pip install fortls`)
+  * Haskell (automatically locates HLS via ghcup, stack, or system PATH; supports Stack and Cabal projects)
+  * Julia
+  * AL
+  * Markdown (must be explicitly specified via `--language markdown` when generating project config, primarily useful for documentation-heavy projects)
+
+#### Web3/Blockchain Language Support
+
+Serena also provides native support for Web3 and blockchain programming languages:
+
+  * **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
+  * **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
+  * **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
+  * **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
+  * **Cairo** (Starknet smart contracts; requires Scarb toolchain)
+
+See [Web3 Language Support Documentation](docs/web3_languages.md) for detailed setup instructions and usage examples.
+
+Support for further languages can easily be added by providing a shallow adapter for a new language server implementation,
+see Serena's [memory on that](.serena/memories/adding_new_language_support_guide.md).
+
+### Community Feedback
+
+Most users report that Serena has strong positive effects on the results of their coding agents, even when used within
+very capable agents like Claude Code. Serena is often described to be a [game changer](https://www.reddit.com/r/ClaudeAI/comments/1lfsdll/try_out_serena_mcp_thank_me_later/), providing an enormous [productivity boost](https://www.reddit.com/r/ClaudeCode/comments/1mguoia/absolutely_insane_improvement_of_claude_code).
+
+Serena excels at navigating and manipulating complex codebases, providing tools that support precise code retrieval and editing in the presence of large, strongly structured codebases.
+However, when dealing with tasks that involve only very few/small files, you may not benefit from including Serena on top of your existing coding agent. 
+In particular, when writing code from scratch, Serena will not provide much value initially, as the more complex structures that Serena handles more gracefully than simplistic, file-based approaches are yet to be created.
+
+Several videos and blog posts have talked about Serena:
+
+* YouTube:
+    * [AI Labs](https://www.youtube.com/watch?v=wYWyJNs1HVk&t=1s)
+    * [Yo Van Eyck](https://www.youtube.com/watch?v=UqfxuQKuMo8&t=45s)
+    * [JeredBlu](https://www.youtube.com/watch?v=fzPnM3ySmjE&t=32s)
 With Serena's LSP library, we provide **support for over 30 programming languages**, including
 AL, Bash, C#, C/C++, Clojure, Dart, Elixir, Elm, Erlang, Fortran, Go, Haskell, Java, Javascript, Julia, Kotlin, Lua, Markdown, Nix, Perl, PHP, Python, R, Ruby, Rust, Scala, Swift, TypeScript and Zig.
 
