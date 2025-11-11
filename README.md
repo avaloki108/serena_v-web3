@@ -68,72 +68,23 @@ complex projects! So not only is it free and open-source, it frequently achieves
 than existing solutions that charge a premium.
 
 Language servers provide support for a wide range of programming languages.
-With Serena, we provide direct, out-of-the-box support for:
-
-  * Python
-  * TypeScript/Javascript
-  * PHP (uses Intelephense LSP; set `INTELEPHENSE_LICENSE_KEY` environment variable for premium features)
-  * Go (requires installation of gopls)
-  * R (requires installation of the `languageserver` R package)
-  * Rust (requires [rustup](https://rustup.rs/) - uses rust-analyzer from your toolchain)
-  * C/C++ (you may experience issues with finding references, we are working on it)
-  * Zig (requires installation of ZLS - Zig Language Server)
-  * C#
-  * Ruby (by default, uses [ruby-lsp](https://github.com/Shopify/ruby-lsp), specify ruby_solargraph as your language to use the previous solargraph based implementation)
-  * Swift
-  * Kotlin (uses the pre-alpha [official kotlin LS](https://github.com/Kotlin/kotlin-lsp), some issues may appear)
-  * Java (_Note_: startup is slow, initial startup especially so. There may be issues with java on macos and linux, we are working on it.)
-  * Clojure
-  * Dart
-  * Bash
-  * Lua (automatically downloads lua-language-server if not installed)
-  * Nix (requires nixd installation)
-  * Elixir (requires installation of NextLS and Elixir; **Windows not supported**)
-  * Elm (automatically downloads elm-language-server if not installed; requires Elm compiler)
-  * Scala (requires some [manual setup](docs/scala_setup_guide_for_serena.md); uses Metals LSP)
-  * Erlang (requires installation of beam and [erlang_ls](https://github.com/erlang-ls/erlang_ls), experimental, might be slow or hang)
-  * Perl (requires installation of Perl::LanguageServer)
-  * Fortran (requires installation of fortls: `pip install fortls`)
-  * Haskell (automatically locates HLS via ghcup, stack, or system PATH; supports Stack and Cabal projects)
-  * Julia
-  * AL
-  * Markdown (must be explicitly specified via `--language markdown` when generating project config, primarily useful for documentation-heavy projects)
-
-#### Web3/Blockchain Language Support
-
-Serena also provides native support for Web3 and blockchain programming languages:
-
-  * **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
-  * **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
-  * **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
-  * **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
-  * **Cairo** (Starknet smart contracts; requires Scarb toolchain)
-
-See [Web3 Language Support Documentation](docs/web3_languages.md) for detailed setup instructions and usage examples.
-
-Support for further languages can easily be added by providing a shallow adapter for a new language server implementation,
-see Serena's [memory on that](.serena/memories/adding_new_language_support_guide.md).
-
-### Community Feedback
-
-Most users report that Serena has strong positive effects on the results of their coding agents, even when used within
-very capable agents like Claude Code. Serena is often described to be a [game changer](https://www.reddit.com/r/ClaudeAI/comments/1lfsdll/try_out_serena_mcp_thank_me_later/), providing an enormous [productivity boost](https://www.reddit.com/r/ClaudeCode/comments/1mguoia/absolutely_insane_improvement_of_claude_code).
-
-Serena excels at navigating and manipulating complex codebases, providing tools that support precise code retrieval and editing in the presence of large, strongly structured codebases.
-However, when dealing with tasks that involve only very few/small files, you may not benefit from including Serena on top of your existing coding agent. 
-In particular, when writing code from scratch, Serena will not provide much value initially, as the more complex structures that Serena handles more gracefully than simplistic, file-based approaches are yet to be created.
-
-Several videos and blog posts have talked about Serena:
-
-* YouTube:
-    * [AI Labs](https://www.youtube.com/watch?v=wYWyJNs1HVk&t=1s)
-    * [Yo Van Eyck](https://www.youtube.com/watch?v=UqfxuQKuMo8&t=45s)
-    * [JeredBlu](https://www.youtube.com/watch?v=fzPnM3ySmjE&t=32s)
 With Serena's LSP library, we provide **support for over 30 programming languages**, including
 AL, Bash, C#, C/C++, Clojure, Dart, Elixir, Elm, Erlang, Fortran, Go, Haskell, Java, Javascript, Julia, Kotlin, Lua, Markdown, Nix, Perl, PHP, Python, R, Ruby, Rust, Scala, Swift, TypeScript and Zig.
 
 > [!IMPORTANT]
 > Some languages require additional dependencies to be installed; see the [Language Support](https://oraios.github.io/serena/01-about/020_programming-languages.html) page for details.
+
+#### Web3/Blockchain Language Support
+
+Serena also provides native support for Web3 and blockchain programming languages:
+
+* **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
+* **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
+* **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
+* **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
+* **Cairo** (Starknet smart contracts; requires Scarb toolchain)
+
+See [Web3 Language Support Documentation](docs/web3_languages.md) for detailed setup instructions and usage examples.
 
 ## Quick Start
 
@@ -232,65 +183,3 @@ It is also relatively straightforward to add [support for a new programming lang
 
 We look forward to seeing what the community will come up with!
 For details on contributing, see [contributing guidelines](/CONTRIBUTING.md).
-
-## List of Tools
-
-Here is the list of Serena's default tools with a short description (output of `uv run serena tools list`):
-
-* `activate_project`: Activates a project based on the project name or path.
-* `check_onboarding_performed`: Checks whether project onboarding was already performed.
-* `create_text_file`: Creates/overwrites a file in the project directory.
-* `delete_memory`: Deletes a memory from Serena's project-specific memory store.
-* `execute_shell_command`: Executes a shell command.
-* `find_file`: Finds files in the given relative paths
-* `find_referencing_symbols`: Finds symbols that reference the symbol at the given location (optionally filtered by type).
-* `find_symbol`: Performs a global (or local) search for symbols with/containing a given name/substring (optionally filtered by type).
-* `get_current_config`: Prints the current configuration of the agent, including the active and available projects, tools, contexts, and modes.
-* `get_symbols_overview`: Gets an overview of the top-level symbols defined in a given file.
-* `insert_after_symbol`: Inserts content after the end of the definition of a given symbol.
-* `insert_before_symbol`: Inserts content before the beginning of the definition of a given symbol.
-* `list_dir`: Lists files and directories in the given directory (optionally with recursion).
-* `list_memories`: Lists memories in Serena's project-specific memory store.
-* `onboarding`: Performs onboarding (identifying the project structure and essential tasks, e.g. for testing or building).
-* `prepare_for_new_conversation`: Provides instructions for preparing for a new conversation (in order to continue with the necessary context).
-* `read_file`: Reads a file within the project directory.
-* `read_memory`: Reads the memory with the given name from Serena's project-specific memory store.
-* `rename_symbol`: Renames a symbol throughout the codebase using language server refactoring capabilities.
-* `replace_regex`: Replaces content in a file by using regular expressions.
-* `replace_symbol_body`: Replaces the full definition of a symbol.
-* `search_for_pattern`: Performs a search for a pattern in the project.
-* `think_about_collected_information`: Thinking tool for pondering the completeness of collected information.
-* `think_about_task_adherence`: Thinking tool for determining whether the agent is still on track with the current task.
-* `think_about_whether_you_are_done`: Thinking tool for determining whether the task is truly completed.
-* `write_memory`: Writes a named memory (for future reference) to Serena's project-specific memory store.
-
-### Web3 Security Tools
-
-Serena includes specialized tools for Web3 vulnerability hunting and security analysis:
-
-* `analyze_smart_contract`: Analyzes smart contract code for common vulnerabilities including reentrancy, overflow, unprotected functions, and more.
-* `analyze_transaction`: Analyzes blockchain transactions for suspicious patterns, MEV, flash loan attacks, and security concerns.
-* `check_defi_protocol`: Checks DeFi protocol configurations for security issues and best practices.
-* `web3_threat_intelligence`: Integrates with Web3 threat intelligence sources to check addresses and contracts against known threats.
-
-See [Web3 Security Documentation](docs/web3_security.md) for detailed usage examples and configuration options.
-
-There are several tools that are disabled by default, and have to be enabled explicitly, e.g., through the context or modes.
-Note that several of our default contexts do enable some of these tools. For example, the `desktop-app` context enables the `execute_shell_command` tool.
-
-The full list of optional tools is (output of `uv run serena tools list --only-optional`):
-
-* `delete_lines`: Deletes a range of lines within a file.
-* `get_current_config`: Prints the current configuration of the agent, including the active and available projects, tools, contexts, and modes.
-* `initial_instructions`: Gets the initial instructions for the current project.
-    Should only be used in settings where the system prompt cannot be set,
-    e.g. in clients you have no control over, like Claude Desktop.
-* `insert_at_line`: Inserts content at a given line in a file.
-* `jet_brains_find_referencing_symbols`: Finds symbols that reference the given symbol
-* `jet_brains_find_symbol`: Performs a global (or local) search for symbols with/containing a given name/substring (optionally filtered by type).
-* `jet_brains_get_symbols_overview`: Retrieves an overview of the top-level symbols within a specified file
-* `remove_project`: Removes a project from the Serena configuration.
-* `replace_lines`: Replaces a range of lines within a file with new content.
-* `restart_language_server`: Restarts the language server, may be necessary when edits not through Serena happen.
-* `summarize_changes`: Provides instructions for summarizing the changes made to the codebase.
-* `switch_modes`: Activates modes by providing a list of their names

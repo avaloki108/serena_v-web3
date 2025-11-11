@@ -175,7 +175,9 @@ class Language(str, Enum):
                 return FilenameMatcher("*.sol")
             case self.VYPER:
                 return FilenameMatcher("*.vy")
-            case self.MOVE | self.SUI_MOVE:
+            case self.MOVE:
+                return FilenameMatcher("*.move")
+            case self.SUI_MOVE:
                 return FilenameMatcher("*.move")
             case self.CAIRO:
                 return FilenameMatcher("*.cairo")
@@ -321,23 +323,23 @@ class Language(str, Enum):
 
                 return HaskellLanguageServer
             case self.SOLIDITY:
-                from solidlsp.language_servers.solidity_ls import SolidityLanguageServer
+                from solidlsp.language_servers.solidity_language_server import SolidityLanguageServer
 
                 return SolidityLanguageServer
             case self.VYPER:
-                from solidlsp.language_servers.vyper_ls import VyperLanguageServer
+                from solidlsp.language_servers.vyper_language_server import VyperLanguageServer
 
                 return VyperLanguageServer
             case self.MOVE:
-                from solidlsp.language_servers.move_analyzer import MoveAnalyzer
+                from solidlsp.language_servers.move_language_server import MoveLanguageServer
 
-                return MoveAnalyzer
+                return MoveLanguageServer
             case self.SUI_MOVE:
-                from solidlsp.language_servers.sui_move_analyzer import SuiMoveAnalyzer
+                from solidlsp.language_servers.sui_move_language_server import SuiMoveLanguageServer
 
-                return SuiMoveAnalyzer
+                return SuiMoveLanguageServer
             case self.CAIRO:
-                from solidlsp.language_servers.cairo_ls import CairoLanguageServer
+                from solidlsp.language_servers.cairo_language_server import CairoLanguageServer
 
                 return CairoLanguageServer
             case _:
