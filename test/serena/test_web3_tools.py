@@ -15,6 +15,10 @@ from serena.tools.web3_tools import (
     AnalyzeTransactionTool,
     Web3ThreatIntelligenceTool,
 )
+from serena.tools.diagnostic_tools import (
+    CheckLanguageServerStatusTool,
+    DetectWeb3LanguagesTool,
+)
 
 
 @pytest.fixture
@@ -467,3 +471,189 @@ class TestWeb3ThreatIntelligenceTool:
         result = json.loads(result_json)
 
         assert result["checked_types"] == "scam"
+
+
+class TestCheckLanguageServerStatusTool:
+    """Tests for language server status diagnostic tool."""
+
+    def test_check_status_no_project(self):
+        """Test when no project is active."""
+        # Create agent without project
+        agent = SerenaAgent()
+        tool = CheckLanguageServerStatusTool(agent)
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        assert "error" in result
+        assert "No active project" in result["error"]
+
+    def test_check_status_with_project(self, agent_with_temp_project):
+        """Test language server status check with active project."""
+        agent, _ = agent_with_temp_project
+        tool = CheckLanguageServerStatusTool(agent)
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        # Should have installation instructions
+        assert "installation_instructions" in result
+        assert "rust" in result["installation_instructions"]
+        assert "solidity" in result["installation_instructions"]
+
+        # Should show configured languages
+        assert "languages_configured" in result
+
+    def test_installation_instructions_format(self, agent_with_temp_project):
+        """Test that installation instructions are properly formatted."""
+        agent, _ = agent_with_temp_project
+        tool = CheckLanguageServerStatusTool(agent)
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        instructions = result["installation_instructions"]
+        
+        # Check that rust instructions exist
+        assert "rust" in instructions
+        rust_info = instructions["rust"]
+        assert "language_server" in rust_info
+        assert "installed" in rust_info
+        assert "install_command" in rust_info
+        assert rust_info["language_server"] == "rust-analyzer"
+
+
+class TestDetectWeb3LanguagesTool:
+    """Tests for Web3 language detection tool."""
+
+    def test_detect_no_project(self):
+        """Test when no project is active."""
+        agent = SerenaAgent()
+        tool = DetectWeb3LanguagesTool(agent)
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        assert "error" in result
+
+    def test_detect_solidity_language(self, agent_with_temp_project):
+        """Test detection of Solidity files."""
+        agent, project_path = agent_with_temp_project
+        tool = DetectWeb3LanguagesTool(agent)
+
+        # Create a Solidity file
+        (project_path / "Contract.sol").write_text("pragma solidity ^0.8.0;")
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        assert "detected_languages" in result
+        assert "solidity" in result["detected_languages"]
+
+    def test_detect_rust_language(self, agent_with_temp_project):
+        """Test detection of Rust/Soroban files."""
+        agent, project_path = agent_with_temp_project
+        tool = DetectWeb3LanguagesTool(agent)
+
+        # Create a Rust file
+        (project_path / "lib.rs").write_text("fn main() {}")
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        assert "detected_languages" in result
+        assert "rust_soroban" in result["detected_languages"]
+
+    def test_detect_vyper_language(self, agent_with_temp_project):
+        """Test detection of Vyper files."""
+        agent, project_path = agent_with_temp_project
+        tool = DetectWeb3LanguagesTool(agent)
+
+        # Create a Vyper file
+        (project_path / "contract.vy").write_text("# Vyper contract")
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        assert "detected_languages" in result
+        assert "vyper" in result["detected_languages"]
+
+    def test_detect_multiple_languages(self, agent_with_temp_project):
+        """Test detection of multiple Web3 languages."""
+        agent, project_path = agent_with_temp_project
+        tool = DetectWeb3LanguagesTool(agent)
+
+        # Create multiple Web3 files
+        (project_path / "Token.sol").write_text("pragma solidity ^0.8.0;")
+        (project_path / "lib.rs").write_text("fn main() {}")
+        (project_path / "contract.vy").write_text("# Vyper contract")
+
+        result_json = tool.apply()
+        result = json.loads(result_json)
+
+        detected = result["detected_languages"]
+        assert "solidity" in detected
+        assert "rust_soroban" in detected
+        assert "vyper" in detected
+        assert len(detected) == 3
+
+
+class TestAnalyzeSmartContractToolEnhanced:
+    """Tests for enhanced smart contract analysis with language server support."""
+
+    def test_analyze_with_language_server_parameter(self, agent_with_temp_project):
+        """Test that use_language_server parameter is accepted."""
+        agent, project_path = agent_with_temp_project
+        tool = AnalyzeSmartContractTool(agent)
+
+        contract_content = """
+pragma solidity ^0.8.0;
+
+contract Simple {
+    uint256 public value;
+}
+"""
+        contract_path = project_path / "Simple.sol"
+        contract_path.write_text(contract_content)
+
+        # Test with language server enabled (default)
+        result_json = tool.apply("Simple.sol", use_language_server=True)
+        result = json.loads(result_json)
+        
+        assert "language_server_enhanced" in result
+        
+        # Test with language server disabled
+        result_json = tool.apply("Simple.sol", use_language_server=False)
+        result = json.loads(result_json)
+        
+        assert "language_server_enhanced" in result
+        assert result["language_server_enhanced"] is False
+
+    def test_analyze_rust_soroban_contract(self, agent_with_temp_project):
+        """Test analysis of Rust/Soroban smart contracts."""
+        agent, project_path = agent_with_temp_project
+        tool = AnalyzeSmartContractTool(agent)
+
+        contract_content = """
+use soroban_sdk::{contract, contractimpl, Env, Symbol};
+
+#[contract]
+pub struct HelloContract;
+
+#[contractimpl]
+impl HelloContract {
+    pub fn hello(env: Env, to: Symbol) -> Symbol {
+        to
+    }
+}
+"""
+        contract_path = project_path / "contract.rs"
+        contract_path.write_text(contract_content)
+
+        result_json = tool.apply("contract.rs")
+        result = json.loads(result_json)
+
+        # Should successfully analyze Rust files
+        assert result["file"] == "contract.rs"
+        assert result["file_type"] == ".rs"
+

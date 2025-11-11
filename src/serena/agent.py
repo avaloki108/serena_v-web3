@@ -217,6 +217,19 @@ class SerenaAgent:
     def get_language_server_manager_or_raise(self) -> LanguageServerManager:
         language_server_manager = self.get_language_server_manager()
         if language_server_manager is None:
+            # Attempt lazy initialization if we have an active project
+            if self._active_project is not None:
+                log.warning("Language server manager not initialized. Attempting lazy initialization...")
+                try:
+                    self.reset_language_server_manager()
+                    language_server_manager = self.get_language_server_manager()
+                    if language_server_manager is not None:
+                        log.info("Language server manager successfully initialized via lazy initialization.")
+                        return language_server_manager
+                except Exception as e:
+                    log.error(f"Failed to lazily initialize language server manager: {e}", exc_info=e)
+            
+            # If still None, provide a detailed error message
             raise Exception(
                 "The language server manager is not initialized, indicating a problem during project activation. "
                 "Inform the user, telling them to inspect Serena's logs in order to determine the issue. "

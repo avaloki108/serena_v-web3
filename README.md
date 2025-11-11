@@ -78,13 +78,47 @@ AL, Bash, C#, C/C++, Clojure, Dart, Elixir, Elm, Erlang, Fortran, Go, Haskell, J
 
 Serena also provides native support for Web3 and blockchain programming languages:
 
-* **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
-* **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
-* **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
-* **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
-* **Cairo** (Starknet smart contracts; requires Scarb toolchain)
+  * **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
+  * **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
+  * **Rust/Soroban** (Stellar smart contracts; requires rustup with rust-analyzer component)
+  * **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
+  * **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
+  * **Cairo** (Starknet smart contracts; requires Scarb toolchain and cairo-language-server)
 
-See [Web3 Language Support Documentation](docs/web3_languages.md) for detailed setup instructions and usage examples.
+**Language Server Setup for Web3**:
+
+For enhanced Web3 security analysis and symbol-level code navigation, install the appropriate language servers:
+
+```bash
+# Rust/Soroban (Stellar)
+rustup component add rust-analyzer
+
+# Solidity (Ethereum, BSC, Polygon, etc.)
+npm install -g @nomicfoundation/solidity-language-server
+
+# Vyper (Alternative to Solidity)
+pip install vyper-lsp
+
+# Cairo (Starknet)
+cargo install cairo-language-server
+
+# Move (Aptos/Sui)
+cargo install --git https://github.com/move-language/move move-analyzer
+```
+
+**Checking Language Server Status**:
+
+Serena provides diagnostic tools to check which language servers are installed and running:
+
+```bash
+# Use the check_language_server_status tool in your agent
+# It will show:
+# - Which language servers are running
+# - Which failed to start
+# - Installation instructions for missing servers
+```
+
+See [Web3 Language Support Documentation](docs/web3_languages.md) and [Web3 Security Documentation](docs/web3_security.md) for detailed setup instructions, usage examples, and troubleshooting.
 
 ## Quick Start
 
@@ -183,3 +217,80 @@ It is also relatively straightforward to add [support for a new programming lang
 
 We look forward to seeing what the community will come up with!
 For details on contributing, see [contributing guidelines](/CONTRIBUTING.md).
+
+## List of Tools
+
+Here is the list of Serena's default tools with a short description (output of `uv run serena tools list`):
+
+* `activate_project`: Activates a project based on the project name or path.
+* `check_onboarding_performed`: Checks whether project onboarding was already performed.
+* `create_text_file`: Creates/overwrites a file in the project directory.
+* `delete_memory`: Deletes a memory from Serena's project-specific memory store.
+* `execute_shell_command`: Executes a shell command.
+* `find_file`: Finds files in the given relative paths
+* `find_referencing_symbols`: Finds symbols that reference the symbol at the given location (optionally filtered by type).
+* `find_symbol`: Performs a global (or local) search for symbols with/containing a given name/substring (optionally filtered by type).
+* `get_current_config`: Prints the current configuration of the agent, including the active and available projects, tools, contexts, and modes.
+* `get_symbols_overview`: Gets an overview of the top-level symbols defined in a given file.
+* `insert_after_symbol`: Inserts content after the end of the definition of a given symbol.
+* `insert_before_symbol`: Inserts content before the beginning of the definition of a given symbol.
+* `list_dir`: Lists files and directories in the given directory (optionally with recursion).
+* `list_memories`: Lists memories in Serena's project-specific memory store.
+* `onboarding`: Performs onboarding (identifying the project structure and essential tasks, e.g. for testing or building).
+* `prepare_for_new_conversation`: Provides instructions for preparing for a new conversation (in order to continue with the necessary context).
+* `read_file`: Reads a file within the project directory.
+* `read_memory`: Reads the memory with the given name from Serena's project-specific memory store.
+* `rename_symbol`: Renames a symbol throughout the codebase using language server refactoring capabilities.
+* `replace_regex`: Replaces content in a file by using regular expressions.
+* `replace_symbol_body`: Replaces the full definition of a symbol.
+* `search_for_pattern`: Performs a search for a pattern in the project.
+* `think_about_collected_information`: Thinking tool for pondering the completeness of collected information.
+* `think_about_task_adherence`: Thinking tool for determining whether the agent is still on track with the current task.
+* `think_about_whether_you_are_done`: Thinking tool for determining whether the task is truly completed.
+* `write_memory`: Writes a named memory (for future reference) to Serena's project-specific memory store.
+
+### Web3 Security Tools
+
+Serena includes specialized tools for Web3 vulnerability hunting and security analysis:
+
+* `analyze_smart_contract`: Analyzes smart contract code for common vulnerabilities including reentrancy, overflow, unprotected functions, and more. Supports language server-enhanced analysis for deeper inspection.
+* `analyze_transaction`: Analyzes blockchain transactions for suspicious patterns, MEV, flash loan attacks, and security concerns.
+* `check_defi_protocol`: Checks DeFi protocol configurations for security issues and best practices.
+* `web3_threat_intelligence`: Integrates with Web3 threat intelligence sources to check addresses and contracts against known threats.
+
+**Diagnostic Tools** (optional, for troubleshooting):
+
+* `check_language_server_status`: Shows which language servers are running, which failed, and provides installation instructions for Web3 language servers.
+* `detect_web3_languages`: Detects which Web3 programming languages are present in your project.
+
+**Language Server Integration**:
+
+Web3 security tools leverage language servers when available for enhanced analysis:
+- **Rust/Soroban**: rust-analyzer for Stellar smart contracts
+- **Solidity**: solidity-language-server for Ethereum contracts  
+- **Vyper**: vyper-lsp for Vyper contracts
+- **Cairo**: cairo-language-server for Starknet contracts
+
+If language servers are not available, the tools automatically fall back to pattern-based analysis.
+
+See [Web3 Security Documentation](docs/web3_security.md) for detailed usage examples, language server setup, and configuration options.
+
+There are several tools that are disabled by default, and have to be enabled explicitly, e.g., through the context or modes.
+Note that several of our default contexts do enable some of these tools. For example, the `desktop-app` context enables the `execute_shell_command` tool.
+
+The full list of optional tools is (output of `uv run serena tools list --only-optional`):
+
+* `delete_lines`: Deletes a range of lines within a file.
+* `get_current_config`: Prints the current configuration of the agent, including the active and available projects, tools, contexts, and modes.
+* `initial_instructions`: Gets the initial instructions for the current project.
+    Should only be used in settings where the system prompt cannot be set,
+    e.g. in clients you have no control over, like Claude Desktop.
+* `insert_at_line`: Inserts content at a given line in a file.
+* `jet_brains_find_referencing_symbols`: Finds symbols that reference the given symbol
+* `jet_brains_find_symbol`: Performs a global (or local) search for symbols with/containing a given name/substring (optionally filtered by type).
+* `jet_brains_get_symbols_overview`: Retrieves an overview of the top-level symbols within a specified file
+* `remove_project`: Removes a project from the Serena configuration.
+* `replace_lines`: Replaces a range of lines within a file with new content.
+* `restart_language_server`: Restarts the language server, may be necessary when edits not through Serena happen.
+* `summarize_changes`: Provides instructions for summarizing the changes made to the codebase.
+* `switch_modes`: Activates modes by providing a list of their names

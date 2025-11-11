@@ -32,8 +32,53 @@ result = tool.apply(
 
 #### Supported Languages
 
-- **Solidity** (.sol files)
-- **Vyper** (.vy files) - coming soon
+- **Solidity** (.sol files) - Ethereum, BSC, Polygon, etc.
+- **Vyper** (.vy files) - Alternative to Solidity
+- **Rust** (.rs files) - Soroban smart contracts (Stellar)
+
+#### Language Server Enhanced Analysis
+
+Serena can leverage language servers for deeper vulnerability analysis when available. Language server-based analysis provides:
+
+- **Symbol-level tracking**: Track vulnerable patterns through function call graphs
+- **Cross-file analysis**: Find vulnerabilities that span multiple files
+- **More accurate detection**: Reduce false positives with semantic understanding
+- **Faster analysis**: Cached symbol information speeds up repeated checks
+
+**Language Server Requirements:**
+
+For enhanced analysis, install the appropriate language servers:
+
+| Language | Language Server | Installation |
+|----------|----------------|--------------|
+| Rust/Soroban | rust-analyzer | `rustup component add rust-analyzer` |
+| Solidity | solidity-language-server | `npm install -g @nomicfoundation/solidity-language-server` |
+| Vyper | vyper-lsp | `pip install vyper-lsp` |
+
+**Check Language Server Status:**
+
+Use the diagnostic tool to check which language servers are available:
+
+```python
+from serena.tools.diagnostic_tools import CheckLanguageServerStatusTool
+
+tool = CheckLanguageServerStatusTool(agent)
+status = tool.apply()
+print(status)  # Shows which servers are running and installation instructions
+```
+
+**Fallback Behavior:**
+
+If language servers are not available, Serena automatically falls back to pattern-based analysis. This still provides valuable security insights, though with slightly less accuracy than language server-enhanced analysis.
+
+To force pattern-based analysis even when language servers are available:
+
+```python
+result = tool.apply(
+    relative_path="contracts/MyToken.sol",
+    use_language_server=False  # Disable language server enhancement
+)
+```
 
 ### 2. Transaction Analysis
 
@@ -290,6 +335,98 @@ for contract_file in glob.glob("contracts/**/*.sol", recursive=True):
 ```
 
 ## Troubleshooting
+
+### Language Server Issues
+
+#### Issue: "Language server manager is not initialized"
+
+**Symptoms**: Symbol-based tools fail with message about language server not being initialized.
+
+**Solutions**:
+
+1. **Check Language Server Installation**:
+   ```bash
+   # For Rust/Soroban
+   rustup component list | grep rust-analyzer
+   which rust-analyzer
+   
+   # For Solidity
+   npm list -g @nomicfoundation/solidity-language-server
+   which solidity-language-server
+   ```
+
+2. **Use Diagnostic Tool**:
+   ```python
+   from serena.tools.diagnostic_tools import CheckLanguageServerStatusTool
+   
+   tool = CheckLanguageServerStatusTool(agent)
+   print(tool.apply())
+   ```
+
+3. **Manual Initialization**:
+   The language server is initialized asynchronously during project activation. If you try to use symbol tools immediately, use the lazy initialization by simply calling the tool - it will automatically attempt to initialize the language server.
+
+4. **Check Logs**:
+   Inspect Serena's logs for detailed error messages about why language servers failed to start. Common issues:
+   - Language server binary not found in PATH
+   - Permission issues
+   - Incompatible versions
+   - Missing dependencies
+
+5. **Fallback to File-Based Tools**:
+   If language servers cannot be initialized, use file-based tools:
+   - `read_file` - Read contract source code
+   - `search_for_pattern` - Search for patterns across files
+   - `replace_regex` - Make changes using regex
+   - Web3 tools with `use_language_server=False`
+
+#### Issue: "Rust analyzer not found"
+
+**Solution**: 
+```bash
+# Install via rustup (recommended)
+rustup component add rust-analyzer
+
+# Or via package manager
+# Ubuntu/Debian
+sudo apt install rust-analyzer
+
+# macOS
+brew install rust-analyzer
+
+# Verify installation
+which rust-analyzer
+rust-analyzer --version
+```
+
+#### Issue: "Solidity language server not found"
+
+**Solution**:
+```bash
+# Install globally
+npm install -g @nomicfoundation/solidity-language-server
+
+# Verify installation
+which solidity-language-server
+solidity-language-server --version
+
+# If npm is not in PATH, add it:
+export PATH="$PATH:$(npm root -g)/.bin"
+```
+
+#### Issue: "Language server starts but fails immediately"
+
+**Possible Causes**:
+1. Project root path issues
+2. Invalid project configuration
+3. Incompatible language server version
+4. Resource constraints (memory, file descriptors)
+
+**Solutions**:
+- Verify project configuration in `.serena/project.yml`
+- Check available system resources
+- Update language server to latest version
+- Reduce project size by excluding large directories in `.gitignore`
 
 ### Issue: "Unsupported file type"
 
