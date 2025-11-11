@@ -53,7 +53,7 @@ class CheckLanguageServerStatusTool(Tool, ToolMarkerOptional):
             result["recommendation"] = "Try using a symbol tool (like get_symbols_overview) which will attempt lazy initialization."
         else:
             result["language_server_manager_initialized"] = True
-            
+
             # Check which servers are running
             for language in project.project_config.languages:
                 try:
@@ -73,7 +73,7 @@ class CheckLanguageServerStatusTool(Tool, ToolMarkerOptional):
     def _get_web3_ls_installation_instructions(self) -> dict[str, dict[str, Any]]:
         """
         Get installation instructions for Web3 language servers.
-        
+
         :return: Dictionary with installation instructions for each language
         """
         instructions = {}
@@ -183,7 +183,7 @@ class DetectWeb3LanguagesTool(Tool, ToolMarkerOptional):
         except Exception as e:
             return json.dumps({"error": f"Failed to gather source files: {e}"})
 
-        result = {
+        result: dict[str, Any] = {
             "project": project.project_name,
             "detected_languages": [lang for lang, detected in detected_languages.items() if detected],
             "configured_languages": [lang.value for lang in project.project_config.languages],

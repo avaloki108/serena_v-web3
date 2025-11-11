@@ -120,12 +120,14 @@ class LanguageServerManager:
                 ls.stop()
             failure_messages = "\n".join([f"  - {lang.value}: {e}" for lang, e in exceptions.items()])
             success_messages = "\n".join([f"  - {lang.value}: Started successfully" for lang in language_servers.keys()])
-            
+
             error_msg = "Failed to start some language servers:\n"
             if language_servers:
                 error_msg += f"\nSuccessfully started:\n{success_messages}\n"
             error_msg += f"\nFailed to start:\n{failure_messages}\n"
-            error_msg += "\nNote: You can still use file-based tools (read_file, search_for_pattern, replace_regex) for basic code operations."
+            error_msg += (
+                "\nNote: You can still use file-based tools (read_file, search_for_pattern, replace_regex) for basic code operations."
+            )
             raise Exception(error_msg)
 
         return LanguageServerManager(language_servers, factory)

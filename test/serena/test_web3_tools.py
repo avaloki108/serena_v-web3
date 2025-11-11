@@ -9,15 +9,15 @@ from pathlib import Path
 import pytest
 
 from serena.agent import SerenaAgent
-from serena.tools.web3_tools import (
-    CheckDeFiProtocolTool,
-    AnalyzeSmartContractTool,
-    AnalyzeTransactionTool,
-    Web3ThreatIntelligenceTool,
-)
 from serena.tools.diagnostic_tools import (
     CheckLanguageServerStatusTool,
     DetectWeb3LanguagesTool,
+)
+from serena.tools.web3_tools import (
+    AnalyzeSmartContractTool,
+    AnalyzeTransactionTool,
+    CheckDeFiProtocolTool,
+    Web3ThreatIntelligenceTool,
 )
 
 
@@ -513,7 +513,7 @@ class TestCheckLanguageServerStatusTool:
         result = json.loads(result_json)
 
         instructions = result["installation_instructions"]
-        
+
         # Check that rust instructions exist
         assert "rust" in instructions
         rust_info = instructions["rust"]
@@ -619,13 +619,13 @@ contract Simple {
         # Test with language server enabled (default)
         result_json = tool.apply("Simple.sol", use_language_server=True)
         result = json.loads(result_json)
-        
+
         assert "language_server_enhanced" in result
-        
+
         # Test with language server disabled
         result_json = tool.apply("Simple.sol", use_language_server=False)
         result = json.loads(result_json)
-        
+
         assert "language_server_enhanced" in result
         assert result["language_server_enhanced"] is False
 
@@ -656,4 +656,3 @@ impl HelloContract {
         # Should successfully analyze Rust files
         assert result["file"] == "contract.rs"
         assert result["file_type"] == ".rs"
-

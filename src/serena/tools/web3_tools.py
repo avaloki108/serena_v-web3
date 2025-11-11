@@ -1,14 +1,50 @@
 """
 Web3 vulnerability hunting tools for smart contract analysis,
 blockchain transaction inspection, and DeFi protocol security.
+
+Vulnerability types are based on the comprehensive list in LAUNDRY-LIST-OF-LOGIC-ERRORS-VULNS.txt,
+including oracle manipulation, governance exploits, vault accounting errors, composability issues,
+MEV attacks, upgrade flaws, and economic edge cases that require deep logic analysis.
 """
 
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypedDict
 
-from serena.tools import SUCCESS_RESULT, Tool
+from serena.tools import Tool
+
+
+# Type definitions for vulnerability findings based on LAUNDRY-LIST-OF-LOGIC-ERRORS-VULNS.txt
+class VulnerabilityFinding(TypedDict, total=False):
+    """
+    Structure for vulnerability findings.
+
+    Covers patterns from simple code smells (reentrancy, overflow) to complex logic flaws
+    (oracle manipulation, governance attacks, vault accounting, composability issues, MEV, etc.)
+    as documented in LAUNDRY-LIST-OF-LOGIC-ERRORS-VULNS.txt.
+    """
+
+    type: str  # Vulnerability type (e.g., "reentrancy", "oracle_manipulation", "governance_attack")
+    severity: Literal["low", "medium", "high", "critical"]  # Severity level
+    line: int  # Line number where issue found (optional for multi-location issues)
+    description: str  # Human-readable description of the vulnerability
+    recommendation: str  # Suggested fix or mitigation
+    category: str  # High-level category (e.g., "oracle", "governance", "vault", "composability", "mev", "upgrade")
+    details: str  # Additional technical details about the finding
+    requires_manual_review: bool  # True for complex logic issues requiring deep analysis
+    economic_impact: str  # Potential economic impact description
+    references: list[str]  # Related exploits or documentation references
+
+
+class ThreatFinding(TypedDict, total=False):
+    """Structure for threat intelligence findings."""
+
+    threat_type: str  # Type of threat (e.g., "scam", "phishing", "hack", "sanctions")
+    severity: Literal["low", "medium", "high", "critical"]
+    source: str  # Database or source of threat intelligence
+    description: str  # Description of the threat
+    details: str  # Additional details
 
 
 class AnalyzeSmartContractTool(Tool):
@@ -80,6 +116,7 @@ class AnalyzeSmartContractTool(Tool):
             except Exception as e:
                 # If language server analysis fails, continue with pattern-based analysis
                 import logging
+
                 logging.getLogger(__name__).debug(f"Language server analysis failed, using pattern-based analysis only: {e}")
 
         result = {
@@ -96,9 +133,9 @@ class AnalyzeSmartContractTool(Tool):
 
     def _analyze_contract_content(
         self, content: str, file_ext: str, vulnerability_types: list[str], severity_threshold: str
-    ) -> list[dict[str, Any]]:
+    ) -> list[VulnerabilityFinding]:
         """Perform static analysis on contract content."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
         severity_levels = {"low": 1, "medium": 2, "high": 3, "critical": 4}
         threshold_level = severity_levels.get(severity_threshold, 2)
 
@@ -129,15 +166,13 @@ class AnalyzeSmartContractTool(Tool):
                 vulnerabilities.extend(self._check_access_control(content))
 
         # Filter by severity threshold
-        filtered_vulnerabilities = [
-            v for v in vulnerabilities if severity_levels.get(v["severity"], 0) >= threshold_level
-        ]
+        filtered_vulnerabilities = [v for v in vulnerabilities if severity_levels.get(v["severity"], 0) >= threshold_level]
 
         return filtered_vulnerabilities
 
-    def _check_reentrancy(self, content: str) -> list[dict[str, Any]]:
+    def _check_reentrancy(self, content: str) -> list[VulnerabilityFinding]:
         """Check for reentrancy vulnerabilities."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
 
         # Pattern: external calls followed by state changes
         lines = content.split("\n")
@@ -158,9 +193,9 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_overflow_issues(self, content: str) -> list[dict[str, Any]]:
+    def _check_overflow_issues(self, content: str) -> list[VulnerabilityFinding]:
         """Check for integer overflow/underflow issues."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
 
         # Check for Solidity version without overflow protection
         version_match = re.search(r"pragma solidity\s+([^;]+);", content)
@@ -185,9 +220,9 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_unprotected_functions(self, content: str) -> list[dict[str, Any]]:
+    def _check_unprotected_functions(self, content: str) -> list[VulnerabilityFinding]:
         """Check for functions without access control."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
         lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
@@ -199,9 +234,7 @@ class AnalyzeSmartContractTool(Tool):
                 end_idx = min(len(lines), i + 3)
                 surrounding_context = "\n".join(lines[start_idx:end_idx])
                 has_modifier = bool(
-                    re.search(
-                        r"(onlyOwner|onlyRole|requiresAuth|nonReentrant|whenNotPaused|modifier)", surrounding_context
-                    )
+                    re.search(r"(onlyOwner|onlyRole|requiresAuth|nonReentrant|whenNotPaused|modifier)", surrounding_context)
                 )
 
                 # Skip view/pure functions
@@ -220,9 +253,9 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_tx_origin(self, content: str) -> list[dict[str, Any]]:
+    def _check_tx_origin(self, content: str) -> list[VulnerabilityFinding]:
         """Check for tx.origin usage."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
         lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
@@ -239,9 +272,9 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_delegatecall(self, content: str) -> list[dict[str, Any]]:
+    def _check_delegatecall(self, content: str) -> list[VulnerabilityFinding]:
         """Check for unsafe delegatecall usage."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
         lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
@@ -258,9 +291,9 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_timestamp_dependence(self, content: str) -> list[dict[str, Any]]:
+    def _check_timestamp_dependence(self, content: str) -> list[VulnerabilityFinding]:
         """Check for timestamp dependence vulnerabilities."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
         lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
@@ -282,9 +315,9 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_unchecked_calls(self, content: str) -> list[dict[str, Any]]:
+    def _check_unchecked_calls(self, content: str) -> list[VulnerabilityFinding]:
         """Check for unchecked external calls."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
         lines = content.split("\n")
 
         for i, line in enumerate(lines, 1):
@@ -304,14 +337,12 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _check_access_control(self, content: str) -> list[dict[str, Any]]:
+    def _check_access_control(self, content: str) -> list[VulnerabilityFinding]:
         """Check for missing or weak access control."""
-        vulnerabilities = []
+        vulnerabilities: list[VulnerabilityFinding] = []
 
         # Check if contract uses any access control mechanism
-        has_access_control = bool(
-            re.search(r"(Ownable|AccessControl|onlyOwner|onlyRole)", content, re.IGNORECASE)
-        )
+        has_access_control = bool(re.search(r"(Ownable|AccessControl|onlyOwner|onlyRole)", content, re.IGNORECASE))
 
         if not has_access_control:
             lines = content.split("\n")
@@ -332,17 +363,17 @@ class AnalyzeSmartContractTool(Tool):
 
         return vulnerabilities
 
-    def _analyze_with_language_server(self, relative_path: str, vulnerability_types: list[str]) -> list[dict[str, Any]]:
+    def _analyze_with_language_server(self, relative_path: str, vulnerability_types: list[str]) -> list[VulnerabilityFinding]:
         """
         Perform enhanced vulnerability analysis using language server symbol information.
         This can find deeper issues by analyzing function call graphs and symbol references.
-        
+
         :param relative_path: path to the contract file
         :param vulnerability_types: types of vulnerabilities to check for
         :return: list of additional vulnerabilities found via language server analysis
         """
-        vulnerabilities = []
-        
+        vulnerabilities: list[VulnerabilityFinding] = []
+
         try:
             # This would use find_symbol and find_referencing_symbols to trace
             # potential vulnerabilities through the call graph
@@ -352,7 +383,7 @@ class AnalyzeSmartContractTool(Tool):
         except Exception:
             # If anything fails, just return empty list - we still have pattern-based analysis
             pass
-        
+
         return vulnerabilities
 
 
@@ -481,7 +512,6 @@ class AnalyzeTransactionTool(Tool):
         findings = []
 
         gas_limit = tx_data.get("gas_limit", 0)
-        gas_price = tx_data.get("gas_price", 0)
 
         if gas_limit > 5000000:  # Unusually high gas limit
             findings.append(
@@ -690,7 +720,7 @@ class CheckDeFiProtocolTool(Tool):
                     if reward_rate > 100:  # >100% APY might be suspicious
                         findings.append(
                             {
-                                    "type": "high_reward_rate",
+                                "type": "high_reward_rate",
                                 "severity": "high",
                                 "description": f"Suspicious reward rate: {reward_rate}%",
                                 "recommendation": "Verify reward rate sustainability",
@@ -775,7 +805,7 @@ class Web3ThreatIntelligenceTool(Tool):
         if not re.match(r"^0x[a-fA-F0-9]{40}$", address):
             return json.dumps({"error": "Invalid address format. Expected 0x followed by 40 hex characters"})
 
-        findings = []
+        findings: list[ThreatFinding] = []
         threat_level = "none"
 
         # Simulate threat intelligence checks (in production, would call real APIs)
@@ -825,15 +855,15 @@ class Web3ThreatIntelligenceTool(Tool):
 
         return json.dumps(result, indent=2)
 
-    def _check_suspicious_patterns(self, address: str) -> list[dict[str, Any]]:
+    def _check_suspicious_patterns(self, address: str) -> list[ThreatFinding]:
         """Check for suspicious address patterns."""
-        findings = []
+        findings: list[ThreatFinding] = []
 
         # Check for vanity addresses (might be impersonation)
         if address.lower().startswith("0x000000") or address.lower().startswith("0xffffff"):
             findings.append(
                 {
-                    "type": "suspicious_pattern",
+                    "threat_type": "suspicious_pattern",
                     "severity": "low",
                     "description": "Vanity address detected - possible impersonation attempt",
                     "details": "Address has suspicious leading zeros/F's",
@@ -842,28 +872,28 @@ class Web3ThreatIntelligenceTool(Tool):
 
         return findings
 
-    def _check_scam_database(self, address: str) -> list[dict[str, Any]]:
+    def _check_scam_database(self, address: str) -> list[ThreatFinding]:
         """Check against scam database."""
-        findings = []
+        findings: list[ThreatFinding] = []
         # In production, this would query real scam databases
         # For now, provide framework for integration
         return findings
 
-    def _check_phishing_database(self, address: str) -> list[dict[str, Any]]:
+    def _check_phishing_database(self, address: str) -> list[ThreatFinding]:
         """Check against phishing database."""
-        findings = []
+        findings: list[ThreatFinding] = []
         # In production, this would query phishing databases
         return findings
 
-    def _check_hack_database(self, address: str) -> list[dict[str, Any]]:
+    def _check_hack_database(self, address: str) -> list[ThreatFinding]:
         """Check against hack/exploit databases."""
-        findings = []
+        findings: list[ThreatFinding] = []
         # In production, this would query exploit databases
         return findings
 
-    def _check_sanctions_list(self, address: str) -> list[dict[str, Any]]:
+    def _check_sanctions_list(self, address: str) -> list[ThreatFinding]:
         """Check against sanctions lists (OFAC, etc.)."""
-        findings = []
+        findings: list[ThreatFinding] = []
         # In production, this would query sanctions lists
         return findings
 

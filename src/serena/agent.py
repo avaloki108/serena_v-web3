@@ -228,7 +228,7 @@ class SerenaAgent:
                         return language_server_manager
                 except Exception as e:
                     log.error(f"Failed to lazily initialize language server manager: {e}", exc_info=e)
-            
+
             # If still None, provide a detailed error message
             raise Exception(
                 "The language server manager is not initialized, indicating a problem during project activation. "
