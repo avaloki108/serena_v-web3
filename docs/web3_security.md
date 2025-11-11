@@ -453,7 +453,7 @@ We welcome contributions to enhance Web3 security analysis capabilities:
 - Improve detection accuracy
 - Add support for more blockchain ecosystems
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](https://github.com/avaloki108/serena_v-web3/blob/main/CONTRIBUTING.md) for details.
 
 ## Resources
 
