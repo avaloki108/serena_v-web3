@@ -105,11 +105,45 @@ Serena also provides native support for Web3 and blockchain programming language
 
   * **Solidity** (Ethereum smart contracts; requires Node.js and @nomicfoundation/solidity-language-server)
   * **Vyper** (Ethereum smart contracts with Python-like syntax; requires vyper and vyper-lsp)
+  * **Rust/Soroban** (Stellar smart contracts; requires rustup with rust-analyzer component)
   * **Move** (Aptos/Diem smart contracts; requires Aptos CLI and move-analyzer)
   * **Sui Move** (Sui blockchain smart contracts; requires Sui CLI and sui-move-analyzer)
-  * **Cairo** (Starknet smart contracts; requires Scarb toolchain)
+  * **Cairo** (Starknet smart contracts; requires Scarb toolchain and cairo-language-server)
 
-See [Web3 Language Support Documentation](docs/web3_languages.md) for detailed setup instructions and usage examples.
+**Language Server Setup for Web3**:
+
+For enhanced Web3 security analysis and symbol-level code navigation, install the appropriate language servers:
+
+```bash
+# Rust/Soroban (Stellar)
+rustup component add rust-analyzer
+
+# Solidity (Ethereum, BSC, Polygon, etc.)
+npm install -g @nomicfoundation/solidity-language-server
+
+# Vyper (Alternative to Solidity)
+pip install vyper-lsp
+
+# Cairo (Starknet)
+cargo install cairo-language-server
+
+# Move (Aptos/Sui)
+cargo install --git https://github.com/move-language/move move-analyzer
+```
+
+**Checking Language Server Status**:
+
+Serena provides diagnostic tools to check which language servers are installed and running:
+
+```bash
+# Use the check_language_server_status tool in your agent
+# It will show:
+# - Which language servers are running
+# - Which failed to start
+# - Installation instructions for missing servers
+```
+
+See [Web3 Language Support Documentation](docs/web3_languages.md) and [Web3 Security Documentation](docs/web3_security.md) for detailed setup instructions, usage examples, and troubleshooting.
 
 Support for further languages can easily be added by providing a shallow adapter for a new language server implementation,
 see Serena's [memory on that](.serena/memories/adding_new_language_support_guide.md).
@@ -268,12 +302,27 @@ Here is the list of Serena's default tools with a short description (output of `
 
 Serena includes specialized tools for Web3 vulnerability hunting and security analysis:
 
-* `analyze_smart_contract`: Analyzes smart contract code for common vulnerabilities including reentrancy, overflow, unprotected functions, and more.
+* `analyze_smart_contract`: Analyzes smart contract code for common vulnerabilities including reentrancy, overflow, unprotected functions, and more. Supports language server-enhanced analysis for deeper inspection.
 * `analyze_transaction`: Analyzes blockchain transactions for suspicious patterns, MEV, flash loan attacks, and security concerns.
 * `check_defi_protocol`: Checks DeFi protocol configurations for security issues and best practices.
 * `web3_threat_intelligence`: Integrates with Web3 threat intelligence sources to check addresses and contracts against known threats.
 
-See [Web3 Security Documentation](docs/web3_security.md) for detailed usage examples and configuration options.
+**Diagnostic Tools** (optional, for troubleshooting):
+
+* `check_language_server_status`: Shows which language servers are running, which failed, and provides installation instructions for Web3 language servers.
+* `detect_web3_languages`: Detects which Web3 programming languages are present in your project.
+
+**Language Server Integration**:
+
+Web3 security tools leverage language servers when available for enhanced analysis:
+- **Rust/Soroban**: rust-analyzer for Stellar smart contracts
+- **Solidity**: solidity-language-server for Ethereum contracts  
+- **Vyper**: vyper-lsp for Vyper contracts
+- **Cairo**: cairo-language-server for Starknet contracts
+
+If language servers are not available, the tools automatically fall back to pattern-based analysis.
+
+See [Web3 Security Documentation](docs/web3_security.md) for detailed usage examples, language server setup, and configuration options.
 
 There are several tools that are disabled by default, and have to be enabled explicitly, e.g., through the context or modes.
 Note that several of our default contexts do enable some of these tools. For example, the `desktop-app` context enables the `execute_shell_command` tool.
