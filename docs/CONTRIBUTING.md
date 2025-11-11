@@ -1,5 +1,3 @@
-GitHub Copilot Chat Assistant
-
 # Contributing
 
 Thank you for wanting to contribute to Serena! This file describes how to make changes, run checks locally, and submit a pull request so your contribution can be reviewed and merged quickly.
