@@ -33,6 +33,7 @@ from serena.util.inspection import determine_programming_language_composition
 from solidlsp.ls_config import Language
 
 from ..analytics import RegisteredTokenCountEstimator
+from ..config.web3_config import QdrantConfig
 from ..util.class_decorators import singleton
 
 if TYPE_CHECKING:
@@ -171,6 +172,7 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
     ignore_all_files_in_gitignore: bool = True
     initial_prompt: str = ""
     encoding: str = DEFAULT_SOURCE_FILE_ENCODING
+    qdrant_config: Optional[QdrantConfig] = None
 
     SERENA_DEFAULT_PROJECT_FILE = "project.yml"
 
@@ -217,6 +219,8 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
             config_with_comments = cls.load_commented_map(PROJECT_TEMPLATE_FILE)
             config_with_comments["project_name"] = project_name
             config_with_comments["languages"] = languages_to_use
+            # Add default Qdrant configuration
+            config_with_comments["qdrant_config"] = QdrantConfig().to_dict()
             if save_to_disk:
                 save_yaml(str(project_root / cls.rel_path_to_project_yml()), config_with_comments, preserve_comments=True)
             return cls._from_dict(config_with_comments)
@@ -236,6 +240,7 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
         data["ignore_all_files_in_gitignore"] = data.get("ignore_all_files_in_gitignore", True)
         data["initial_prompt"] = data.get("initial_prompt", "")
         data["encoding"] = data.get("encoding", DEFAULT_SOURCE_FILE_ENCODING)
+        data["qdrant_config"] = data.get("qdrant_config", None)
 
         # backward compatibility: handle single "language" field
         if len(data["languages"]) == 0 and "language" in data:
@@ -285,6 +290,7 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
             ignore_all_files_in_gitignore=data["ignore_all_files_in_gitignore"],
             initial_prompt=data["initial_prompt"],
             encoding=data["encoding"],
+            qdrant_config=QdrantConfig.from_dict(data["qdrant_config"]) if data.get("qdrant_config") else None,
         )
 
     def to_yaml_dict(self) -> dict:
@@ -293,6 +299,8 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
         """
         d = dataclasses.asdict(self)
         d["languages"] = [lang.value for lang in self.languages]
+        if self.qdrant_config:
+            d["qdrant_config"] = self.qdrant_config.to_dict()
         return d
 
     @classmethod
