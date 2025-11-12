@@ -7,6 +7,53 @@ from typing import Any
 
 
 @dataclass
+class QdrantConfig:
+    """Configuration for Qdrant vector database integration."""
+
+    # Qdrant connection settings
+    qdrant_url: str = "http://localhost:6333"
+    collection_name_prefix: str = "serena_project"
+
+    # Ollama embedding provider settings
+    ollama_provider_url: str = "http://localhost:11434"
+    embedding_model: str = "qwen3-embedding:4b"
+    model_dimension: int = 2560
+
+    # Search settings
+    search_score_threshold: float = 0.80
+    max_search_results: int = 20
+
+    # Docker settings
+    docker_container_name: str = "qdrant"
+    enable_auto_start: bool = True
+
+    # Indexing settings
+    batch_size: int = 100
+    enable_auto_indexing: bool = True
+
+    @classmethod
+    def from_dict(cls, config_dict: dict[str, Any]) -> "QdrantConfig":
+        """Create QdrantConfig from dictionary."""
+        return cls(**{k: v for k, v in config_dict.items() if k in cls.__annotations__})
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert QdrantConfig to dictionary."""
+        return {
+            "qdrant_url": self.qdrant_url,
+            "collection_name_prefix": self.collection_name_prefix,
+            "ollama_provider_url": self.ollama_provider_url,
+            "embedding_model": self.embedding_model,
+            "model_dimension": self.model_dimension,
+            "search_score_threshold": self.search_score_threshold,
+            "max_search_results": self.max_search_results,
+            "docker_container_name": self.docker_container_name,
+            "enable_auto_start": self.enable_auto_start,
+            "batch_size": self.batch_size,
+            "enable_auto_indexing": self.enable_auto_indexing,
+        }
+
+
+@dataclass
 class Web3Config:
     """Configuration for Web3 vulnerability hunting tools."""
 

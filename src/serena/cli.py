@@ -420,6 +420,8 @@ class ProjectCommands(AutoRegisteringGroup):
         "--language", type=str, multiple=True, help="Programming language(s); inferred if not specified. Can be passed multiple times."
     )
     def generate_yml(project_path: str, language: tuple[str, ...]) -> None:
+        from serena.config.web3_config import QdrantConfig
+
         yml_path = os.path.join(project_path, ProjectConfig.rel_path_to_project_yml())
         if os.path.exists(yml_path):
             raise FileExistsError(f"Project file {yml_path} already exists.")
@@ -432,7 +434,18 @@ class ProjectCommands(AutoRegisteringGroup):
                     all_langs = [l.value for l in Language]
                     raise ValueError(f"Unknown language '{lang}'. Supported: {all_langs}")
         generated_conf = ProjectConfig.autogenerate(project_root=project_path, languages=languages if languages else None)
+        # Add default Qdrant configuration
+        generated_conf.qdrant_config = QdrantConfig()
+        # Save the config manually to include qdrant_config
+        from ruamel.yaml.comments import CommentedMap
+
+        from serena.util.general import save_yaml
+
+        config_with_comments = ProjectConfig.load_commented_map(PROJECT_TEMPLATE_FILE)
+        config_with_comments.update(generated_conf.to_yaml_dict())
+        save_yaml(yml_path, config_with_comments, preserve_comments=True)
         print(f"Generated project.yml with languages {generated_conf.languages} at {yml_path}.")
+        print("Qdrant vector database configuration has been added with default settings.")
 
     @staticmethod
     @click.command("index", help="Index a project by saving symbols to the LSP cache.")
@@ -496,6 +509,19 @@ class ProjectCommands(AutoRegisteringGroup):
                         f.write(f"{file}\n")
                         f.write(f"{exception}\n")
                 click.echo(f"Failed to index {len(files_failed)} files, see:\n{log_file}")
+
+            # Qdrant indexing
+            if proj.project_config.qdrant_config and proj.project_config.qdrant_config.enable_auto_indexing:
+                click.echo("Indexing with Qdrant vector database …")
+                try:
+                    from serena.project_indexer import ProjectIndexer
+
+                    indexer = ProjectIndexer(proj)
+                    indexer.index_project_files()
+                    click.echo(f"Qdrant indexing completed for collection '{indexer.collection_name}'")
+                except Exception as e:
+                    click.echo(f"Warning: Qdrant indexing failed: {e}", err=True)
+                    log.warning(f"Qdrant indexing failed: {e}")
         finally:
             ls_mgr.stop_all()
 
