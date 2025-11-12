@@ -7,6 +7,7 @@
   Unlike most other tools, it is not tied to an LLM, framework or an interface, making it easy to use it in a variety of ways.
 * :wrench: Serena provides essential **semantic code retrieval and editing tools** that are akin to an IDE's capabilities, extracting code entities at the symbol level and exploiting relational structure. When combined with an existing coding agent, these tools greatly enhance (token) efficiency.
 * :shield: Serena now includes **Web3 vulnerability hunting capabilities** for smart contract analysis, blockchain transaction inspection, and DeFi protocol security assessment. See [Web3 Security Documentation](docs/web3_security.md) for details.
+* :mag: Serena features **Qdrant vector database integration** for intelligent semantic code search and automatic project indexing using embeddings. See [Qdrant Integration Documentation](docs/QDRANT_INTEGRATION.md) for details.
 * :free: Serena is **free & open-source**, enhancing the capabilities of LLMs you already have access to free of charge.
 
 You can think of Serena as providing IDE-like tools to your LLM/coding agent. 

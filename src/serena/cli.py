@@ -543,6 +543,55 @@ class ProjectCommands(AutoRegisteringGroup):
         click.echo(f"Path '{path}' IS {'ignored' if is_ignored else 'IS NOT ignored'} by the project configuration.")
 
     @staticmethod
+    @click.command("search", help="Search code semantically using Qdrant vector database.")
+    @click.argument("query", type=str)
+    @click.argument("project", type=click.Path(exists=True, file_okay=False, dir_okay=True), default=os.getcwd(), required=False)
+    @click.option("--limit", type=int, default=None, help="Maximum number of results to return.")
+    def search(query: str, project: str, limit: int | None) -> None:
+        """
+        Search for code semantically using Qdrant vector database.
+
+        :param query: The search query (natural language or code pattern)
+        :param project: The path to the project directory, defaults to the current working directory
+        :param limit: Maximum number of results to return (uses config default if not specified)
+        """
+        proj = Project.load(os.path.abspath(project))
+
+        if not proj.project_config.qdrant_config or not proj.project_config.qdrant_config.enable_auto_indexing:
+            click.echo("Qdrant is not enabled for this project. Enable it in .serena/project.yml", err=True)
+            exit(1)
+
+        try:
+            from serena.project_indexer import ProjectIndexer
+
+            indexer = ProjectIndexer(proj)
+            click.echo(f"Searching for: {query}")
+            results = indexer.search_in_project(query, limit=limit)
+
+            if not results:
+                click.echo("No results found.")
+                return
+
+            click.echo(f"\nFound {len(results)} results:\n")
+            for i, result in enumerate(results, start=1):
+                score = result.get("score", 0)
+                payload = result.get("payload", {})
+                file_path = payload.get("file_path", "unknown")
+                text = payload.get("text", "")
+
+                click.echo(f"{i}. {file_path} (Score: {score:.3f})")
+                # Show first 200 chars of content
+                preview = text[:200].replace("\n", " ")
+                if len(text) > 200:
+                    preview += "..."
+                click.echo(f"   {preview}\n")
+
+        except Exception as e:
+            click.echo(f"Search failed: {e}", err=True)
+            log.error(f"Qdrant search failed: {e}")
+            exit(1)
+
+    @staticmethod
     @click.command("index-file", help="Index a single file by saving its symbols to the LSP cache.")
     @click.argument("file", type=click.Path(exists=True, file_okay=True, dir_okay=False))
     @click.argument("project", type=click.Path(exists=True, file_okay=False, dir_okay=True), default=os.getcwd())
