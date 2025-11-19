@@ -382,52 +382,15 @@ class Project(ToStringMixin):
             self.language_server_manager = None
 
         log.info(f"Creating language server manager for {self.project_root}")
-        try:
-            factory = LanguageServerFactory(
-                project_root=self.project_root,
-                encoding=self.project_config.encoding,
-                ignored_patterns=self._ignored_patterns,
-                ls_timeout=ls_timeout,
-                ls_specific_settings=ls_specific_settings,
-                log_level=log_level,
-                trace_lsp_communication=trace_lsp_communication,
-            )
-            self.language_server_manager = LanguageServerManager.from_languages(self.project_config.languages, factory)
-            log.info(f"Successfully created language server manager with {len(self.project_config.languages)} language(s)")
-            return self.language_server_manager
-        except Exception as e:
-            log.error(f"Failed to create language server manager: {e}", exc_info=e)
-            raise
-
-    def _ensure_language_server_manager(
-        self,
-        log_level: int = logging.INFO,
-        ls_timeout: float | None = DEFAULT_TOOL_TIMEOUT - 5,
-        trace_lsp_communication: bool = False,
-        ls_specific_settings: dict[Language, Any] | None = None,
-    ) -> LanguageServerManager | None:
-        """
-        Ensures the language server manager is initialized. If it's not, attempts to create it.
-        This is useful for lazy initialization.
-
-        :param log_level: the log level for the language server
-        :param ls_timeout: the timeout for the language server
-        :param trace_lsp_communication: whether to trace LSP communication
-        :param ls_specific_settings: optional LS specific configuration of the language server
-        :return: the language server manager or None if initialization fails
-        """
-        if self.language_server_manager is None:
-            log.info("Language server manager not initialized. Attempting to create it...")
-            try:
-                return self.create_language_server_manager(
-                    log_level=log_level,
-                    ls_timeout=ls_timeout,
-                    trace_lsp_communication=trace_lsp_communication,
-                    ls_specific_settings=ls_specific_settings,
-                )
-            except Exception as e:
-                log.warning(f"Failed to create language server manager during lazy initialization: {e}")
-                return None
+        factory = LanguageServerFactory(
+            project_root=self.project_root,
+            encoding=self.project_config.encoding,
+            ignored_patterns=self._ignored_patterns,
+            ls_timeout=ls_timeout,
+            ls_specific_settings=ls_specific_settings,
+            trace_lsp_communication=trace_lsp_communication,
+        )
+        self.language_server_manager = LanguageServerManager.from_languages(self.project_config.languages, factory)
         return self.language_server_manager
 
     def add_language(self, language: Language) -> None:
