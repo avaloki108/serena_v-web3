@@ -83,6 +83,10 @@ class Language(str, Enum):
     Must be explicitly specified as the main language, not auto-detected.
     This is an edge case primarily useful when working on documentation-heavy projects.
     """
+    YAML = "yaml"
+    """YAML language server (experimental).
+    Must be explicitly specified as the main language, not auto-detected.
+    """
 
     @classmethod
     def iter_all(cls, include_experimental: bool = False) -> Iterable[Self]:
@@ -94,7 +98,7 @@ class Language(str, Enum):
         """
         Check if the language server is experimental or deprecated.
         """
-        return self in {self.TYPESCRIPT_VTS, self.PYTHON_JEDI, self.CSHARP_OMNISHARP, self.RUBY_SOLARGRAPH, self.MARKDOWN}
+        return self in {self.TYPESCRIPT_VTS, self.PYTHON_JEDI, self.CSHARP_OMNISHARP, self.RUBY_SOLARGRAPH, self.MARKDOWN, self.YAML}
 
     def __str__(self) -> str:
         return self.value
@@ -147,6 +151,8 @@ class Language(str, Enum):
                 return FilenameMatcher("*.swift")
             case self.BASH:
                 return FilenameMatcher("*.sh", "*.bash")
+            case self.YAML:
+                return FilenameMatcher("*.yaml", "*.yml")
             case self.ZIG:
                 return FilenameMatcher("*.zig", "*.zon")
             case self.LUA:
@@ -274,12 +280,16 @@ class Language(str, Enum):
                 from solidlsp.language_servers.bash_language_server import BashLanguageServer
 
                 return BashLanguageServer
+            case self.YAML:
+                from solidlsp.language_servers.yaml_language_server import YamlLanguageServer
+
+                return YamlLanguageServer
             case self.ZIG:
                 from solidlsp.language_servers.zls import ZigLanguageServer
 
                 return ZigLanguageServer
             case self.NIX:
-                from solidlsp.language_servers.nixd_ls import NixLanguageServer
+                from solidlsp.language_servers.nixd_ls import NixLanguageServer  # type: ignore
 
                 return NixLanguageServer
             case self.LUA:
@@ -375,7 +385,7 @@ class LanguageServerConfig:
     """File encoding to use when reading source files"""
 
     @classmethod
-    def from_dict(cls, env: dict):
+    def from_dict(cls, env: dict) -> Self:
         """
         Create a MultilspyConfig instance from a dictionary
         """
