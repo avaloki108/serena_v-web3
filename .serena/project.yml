@@ -61,5 +61,11 @@ project_name: "serena"
 languages:
 - python
 - typescript
+- solidity
+- vyper
+- move
+- rust
+- go
+- javascript
 included_optional_tools: []
 encoding: utf-8

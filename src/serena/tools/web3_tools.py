@@ -907,3 +907,6 @@ class Web3ThreatIntelligenceTool(Tool):
             "critical": "Critical threats detected. DO NOT INTERACT with this address.",
         }
         return recommendations.get(threat_level, "Unknown threat level")
+
+
+# Import advanced vulnerability detection tools

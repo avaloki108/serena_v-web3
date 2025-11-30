@@ -534,8 +534,18 @@ class SerenaAgent:
                 self.reset_language_server_manager()
 
         # initialize the language server in the background (if in language server mode)
+        # For the current working directory, initialize synchronously to ensure immediate availability
         if self.is_using_language_server():
-            self.issue_task(init_language_server_manager)
+            import os
+
+            current_dir = os.getcwd()
+            project_matches_cwd = os.path.samefile(project.project_root, current_dir)
+
+            if project_matches_cwd:
+                log.info("Project matches current working directory - initializing language servers synchronously")
+                init_language_server_manager()
+            else:
+                self.issue_task(init_language_server_manager)
 
         if self._project_activation_callback is not None:
             self._project_activation_callback()

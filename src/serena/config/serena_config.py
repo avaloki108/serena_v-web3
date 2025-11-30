@@ -151,7 +151,7 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
                         f"Supported languages are: {language_values}\n"
                         f"Read the documentation for more information."
                     )
-                # sort languages by number of files found
+# sort languages by number of files found
                 languages_and_percentages = sorted(language_composition.items(), key=lambda item: item[1], reverse=True)
                 # find the language with the highest percentage and enable it
                 top_language_pair = languages_and_percentages[0]
@@ -172,6 +172,21 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
                         if enable:
                             languages_to_use.append(lang)
                     print()
+
+                # Check if this is a Web3 project and add Web3 languages
+                web3_languages = {"solidity", "vyper", "move", "sui_move", "cairo"}
+                has_web3 = any(lang in web3_languages for lang in language_composition.keys())
+
+                if has_web3:
+                    log.info("Web3 project detected. Adding Web3-related languages to configuration.")
+                    # Add common Web3 development languages
+                    for web3_lang in ["solidity", "vyper", "move", "rust", "go", "typescript"]:
+                        if web3_lang not in languages_to_use and web3_lang in language_composition:
+                            languages_to_use.append(web3_lang)
+                    # Ensure key tooling languages are present even if no files found
+                    for essential_lang in ["typescript", "python"]:
+                        if essential_lang not in languages_to_use:
+                            languages_to_use.append(essential_lang)
             else:
                 languages_to_use = [lang.value for lang in languages]
             config_with_comments = cls.load_commented_map(PROJECT_TEMPLATE_FILE)
