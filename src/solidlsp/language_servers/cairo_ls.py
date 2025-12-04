@@ -128,7 +128,6 @@ class CairoLanguageServer(SolidLanguageServer):
     def __init__(
         self,
         config: LanguageServerConfig,
-        logger: LanguageServerLogger,
         repository_root_path: str,
         solidlsp_settings: SolidLSPSettings,
     ):
@@ -136,6 +135,7 @@ class CairoLanguageServer(SolidLanguageServer):
         Creates a CairoLanguageServer instance. This class is not meant to be instantiated directly.
         Use LanguageServer.create() instead.
         """
+        logger = LanguageServerLogger("cairo")
         ls_cmd = self._setup_runtime_dependency(logger)
 
         super().__init__(

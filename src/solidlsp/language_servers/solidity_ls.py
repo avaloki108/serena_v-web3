@@ -12,11 +12,12 @@ from overrides import override
 
 from solidlsp.ls import SolidLanguageServer
 from solidlsp.ls_config import LanguageServerConfig
-from solidlsp.ls_logger import LanguageServerLogger
 from solidlsp.ls_utils import PathUtils
 from solidlsp.lsp_protocol_handler.lsp_types import InitializeParams
 from solidlsp.lsp_protocol_handler.server import ProcessLaunchInfo
 from solidlsp.settings import SolidLSPSettings
+
+log = logging.getLogger(__name__)
 
 
 class SolidityLanguageServer(SolidLanguageServer):
@@ -73,30 +74,17 @@ class SolidityLanguageServer(SolidLanguageServer):
 
         return None
 
-    @staticmethod
-    def _setup_runtime_dependency(logger: LanguageServerLogger):
+    def __init__(
+        self,
+        config: LanguageServerConfig,
+        repository_root_path: str,
+        solidlsp_settings: SolidLSPSettings,
+    ):
         """
-        Check if required Solidity language server dependencies are available.
-        Raises RuntimeError with helpful message if dependencies are missing.
+        Creates a SolidityLanguageServer instance. This class is not meant to be instantiated directly.
+        Use LanguageServer.create() instead.
         """
-        node_version = SolidityLanguageServer._check_node_available()
-        if not node_version:
-            raise RuntimeError(
-                "Node.js is not installed. Please install Node.js from https://nodejs.org/ "
-                "and make sure it is added to your PATH. The Solidity language server requires Node.js to run."
-            )
-
-        npm_version = SolidityLanguageServer._check_npm_available()
-        if not npm_version:
-            raise RuntimeError(
-                "npm is not installed. Please install npm (usually comes with Node.js) from https://nodejs.org/ "
-                "and make sure it is added to your PATH."
-            )
-
-        logger.log(f"Node.js version: {node_version}", logging.INFO)
-        logger.log(f"npm version: {npm_version}", logging.INFO)
-
-        ls_cmd = SolidityLanguageServer._get_solidity_ls_path()
+        ls_cmd = self._get_solidity_ls_path()
         if not ls_cmd:
             raise RuntimeError(
                 "Solidity language server not found.\n"
@@ -105,25 +93,8 @@ class SolidityLanguageServer(SolidLanguageServer):
                 "Or ensure 'npx' is available (comes with npm 5.2+) to use the server automatically."
             )
 
-        logger.log(f"Using Solidity language server: {' '.join(ls_cmd)}", logging.INFO)
-        return ls_cmd
-
-    def __init__(
-        self,
-        config: LanguageServerConfig,
-        logger: LanguageServerLogger,
-        repository_root_path: str,
-        solidlsp_settings: SolidLSPSettings,
-    ):
-        """
-        Creates a SolidityLanguageServer instance. This class is not meant to be instantiated directly.
-        Use LanguageServer.create() instead.
-        """
-        ls_cmd = self._setup_runtime_dependency(logger)
-
         super().__init__(
             config,
-            logger,
             repository_root_path,
             ProcessLaunchInfo(cmd=ls_cmd, cwd=repository_root_path),
             "solidity",
@@ -176,7 +147,7 @@ class SolidityLanguageServer(SolidLanguageServer):
             return
 
         def window_log_message(msg):
-            self.logger.log(f"LSP: window/logMessage: {msg}", logging.INFO)
+            log.info(f"LSP: window/logMessage: {msg}")
 
         def do_nothing(params):
             return
@@ -186,14 +157,11 @@ class SolidityLanguageServer(SolidLanguageServer):
         self.server.on_notification("$/progress", do_nothing)
         self.server.on_notification("textDocument/publishDiagnostics", do_nothing)
 
-        self.logger.log("Starting Solidity language server process", logging.INFO)
+        log.info("Starting Solidity language server process")
         self.server.start()
         initialize_params = self._get_initialize_params(self.repository_root_path)
 
-        self.logger.log(
-            "Sending initialize request from LSP client to LSP server and awaiting response",
-            logging.INFO,
-        )
+        log.info("Sending initialize request from LSP client to LSP server and awaiting response")
         init_response = self.server.send.initialize(initialize_params)
 
         # Verify server capabilities

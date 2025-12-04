@@ -106,25 +106,23 @@ class MoveAnalyzer(SolidLanguageServer):
     def __init__(
         self,
         config: LanguageServerConfig,
-        logger: LanguageServerLogger,
         repository_root_path: str,
         solidlsp_settings: SolidLSPSettings,
     ):
         """
-        Creates a MoveAnalyzer instance. This class is not meant to be instantiated directly.
+        Creates a MoveLanguageServer instance. This class is not meant to be instantiated directly.
         Use LanguageServer.create() instead.
         """
-        analyzer_path = self._setup_runtime_dependency(logger)
-
+        logger = LanguageServerLogger("move")
+        ls_cmd = self._setup_runtime_dependency(logger)
         super().__init__(
             config,
             logger,
             repository_root_path,
-            ProcessLaunchInfo(cmd=[analyzer_path], cwd=repository_root_path),
+            ProcessLaunchInfo(cmd=ls_cmd, cwd=repository_root_path),
             "move",
             solidlsp_settings,
         )
-        self.server_ready = threading.Event()
 
     @staticmethod
     def _get_initialize_params(repository_absolute_path: str) -> InitializeParams:
