@@ -57,6 +57,18 @@ class SerenaPaths:
         """
         the path to the user's Serena configuration directory, which is typically ~/.serena
         """
+        self.user_contexts_dir: str = os.path.join(self.user_config_dir, "contexts")
+        """
+        the path to the user's custom contexts directory
+        """
+        self.user_modes_dir: str = os.path.join(self.user_config_dir, "modes")
+        """
+        the path to the user's custom modes directory
+        """
+        self.user_prompt_templates_dir: str = os.path.join(self.user_config_dir, "prompt_templates")
+        """
+        the path to the user's custom prompt templates directory
+        """
 
     def get_next_log_file_path(self, prefix: str) -> str:
         """
@@ -356,6 +368,7 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
     log_level: int = logging.INFO
     trace_lsp_communication: bool = False
     web_dashboard: bool = True
+    web_dashboard_listen_address: str = "127.0.0.1"
     web_dashboard_open_on_launch: bool = True
     tool_timeout: float = DEFAULT_TOOL_TIMEOUT
     loaded_commented_yaml: CommentedMap | None = None
