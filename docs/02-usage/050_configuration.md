@@ -138,9 +138,6 @@ You can manage modes using the `mode` command,
     <serena> mode edit <mode-name>
     <serena> mode delete <mode-name>
 
-<<<<<<< HEAD
-where `<serena>` is [your way of running Serena](020_running).
-=======
 where `<serena>` is [your way of running Serena](020_running).
 
 ## Advanced Configuration

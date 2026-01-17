@@ -72,15 +72,10 @@ class GetSymbolsOverviewTool(Tool, ToolMarkerSymbolicRead):
             raise FileNotFoundError(f"File or directory {relative_path} does not exist in the project.")
         if os.path.isdir(file_path):
             raise ValueError(f"Expected a file path, but got a directory path: {relative_path}. ")
-<<<<<<< HEAD
-        result = symbol_retriever.get_symbol_overview(relative_path)[relative_path]
-        result_json_str = self._to_json([dataclasses.asdict(i) for i in result])
-=======
         result = symbol_retriever.get_symbol_overview(relative_path, depth=depth)[relative_path]
         # Transform to compact format
         compact_result = self._transform_symbols_to_compact_format(result)
         result_json_str = self._to_json(compact_result)
->>>>>>> upstream/main
         return self._limit_length(result_json_str, max_answer_chars)
 
     @staticmethod

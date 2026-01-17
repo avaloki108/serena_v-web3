@@ -29,7 +29,7 @@ from serena.constants import (
     SERENA_MANAGED_DIR_IN_HOME,
     SERENA_MANAGED_DIR_NAME,
 )
-from serena.util.general import load_yaml, save_yaml
+from serena.util.general import load_yaml, save_yaml, get_dataclass_default
 from serena.util.inspection import determine_programming_language_composition
 from solidlsp.ls_config import Language
 
@@ -70,10 +70,15 @@ class SerenaPaths:
         """
         the path to the user's custom prompt templates directory
         """
-        self.news_snippet_id_file: str = os.path.join(self.serena_user_home_dir, "last_read_news_snippet_id.txt")
+        self.news_snippet_id_file: str = os.path.join(self.user_config_dir, "last_read_news_snippet_id.txt")
         """
         file containing the ID of the last read news snippet
         """
+
+    @property
+    def serena_user_home_dir(self) -> str:
+        """the path to the user's Serena home directory"""
+        return self.user_config_dir
 
     def get_next_log_file_path(self, prefix: str) -> str:
         """
@@ -125,7 +130,6 @@ def get_serena_managed_in_project_dir(project_root: str | Path) -> str:
     return os.path.join(project_root, SERENA_MANAGED_DIR_NAME)
 
 
-<<<<<<< HEAD
 def is_running_in_docker() -> bool:
     """Check if we're running inside a Docker container."""
     # Check for Docker-specific files
@@ -137,7 +141,8 @@ def is_running_in_docker() -> bool:
             return "docker" in f.read()
     except FileNotFoundError:
         return False
-=======
+
+
 class LanguageBackend(Enum):
     LSP = "LSP"
     """
@@ -156,7 +161,6 @@ class LanguageBackend(Enum):
             if backend.value.lower() == backend_str.lower():
                 return backend
         raise ValueError(f"Unknown language backend '{backend_str}': valid values are {[b.value for b in LanguageBackend]}")
->>>>>>> upstream/main
 
 
 @dataclass(kw_only=True)
@@ -237,7 +241,6 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
                         if enable:
                             languages_to_use.append(lang)
                     print()
-<<<<<<< HEAD
 
                 # Check if this is a Web3 project and add Web3 languages
                 web3_languages = {"solidity", "vyper", "move", "sui_move", "cairo"}
@@ -253,9 +256,7 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
                     for essential_lang in ["typescript", "python"]:
                         if essential_lang not in languages_to_use:
                             languages_to_use.append(essential_lang)
-=======
                 log.info("Using languages: %s", languages_to_use)
->>>>>>> upstream/main
             else:
                 languages_to_use = [lang.value for lang in languages]
             config_with_comments = cls.load_commented_map(PROJECT_TEMPLATE_FILE)
@@ -428,11 +429,8 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
     trace_lsp_communication: bool = False
     web_dashboard: bool = True
     web_dashboard_listen_address: str = "127.0.0.1"
-<<<<<<< HEAD
     web_dashboard_open_on_launch: bool = True
-=======
     jetbrains_plugin_server_address: str = "127.0.0.1"
->>>>>>> upstream/main
     tool_timeout: float = DEFAULT_TOOL_TIMEOUT
 
     language_backend: LanguageBackend = LanguageBackend.LSP
@@ -468,9 +466,7 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
     # *** static members ***
 
     CONFIG_FILE = "serena_config.yml"
-<<<<<<< HEAD
     CONFIG_FILE_DOCKER = "serena_config.docker.yml"  # Docker-specific config file; auto-generated if missing, mounted via docker-compose for user customization
-=======
     CONFIG_FILE_RENAMED_KEYS = {
         "gui_log_window_enabled": "gui_log_window",
     }
@@ -483,7 +479,6 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
     @property
     def config_file_path(self) -> str | None:
         return self._config_file_path
->>>>>>> upstream/main
 
     def _tostring_includes(self) -> list[str]:
         return ["config_file_path"]
@@ -567,32 +562,28 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
             )
             instance.projects.append(project)
 
-<<<<<<< HEAD
-        # set other configuration parameters
-        if is_running_in_docker():
-            instance.gui_log_window_enabled = False  # not supported in Docker
-        else:
-            instance.gui_log_window_enabled = loaded_commented_yaml.get("gui_log_window", False)
-        instance.log_level = loaded_commented_yaml.get("log_level", loaded_commented_yaml.get("gui_log_level", logging.INFO))
-        instance.web_dashboard = loaded_commented_yaml.get("web_dashboard", True)
-        instance.web_dashboard_open_on_launch = loaded_commented_yaml.get("web_dashboard_open_on_launch", True)
-        instance.tool_timeout = loaded_commented_yaml.get("tool_timeout", DEFAULT_TOOL_TIMEOUT)
-        instance.trace_lsp_communication = loaded_commented_yaml.get("trace_lsp_communication", False)
-        instance.excluded_tools = loaded_commented_yaml.get("excluded_tools", [])
-        instance.included_optional_tools = loaded_commented_yaml.get("included_optional_tools", [])
-        instance.jetbrains = loaded_commented_yaml.get("jetbrains", False)
-        instance.token_count_estimator = loaded_commented_yaml.get(
-            "token_count_estimator", RegisteredTokenCountEstimator.TIKTOKEN_GPT4O.name
-        )
-        instance.default_max_tool_answer_chars = loaded_commented_yaml.get("default_max_tool_answer_chars", 150_000)
-        instance.ls_specific_settings = loaded_commented_yaml.get("ls_specific_settings", {})
-=======
         def get_value_or_default(field_name: str) -> Any:
             key = cls.CONFIG_FILE_RENAMED_KEYS.get(field_name, field_name)
             nonlocal num_migrations
             if key not in loaded_commented_yaml:
                 num_migrations += 1
             return loaded_commented_yaml.get(key, get_dataclass_default(SerenaConfig, field_name))
+
+        # set other configuration parameters
+        if is_running_in_docker():
+            instance.gui_log_window_enabled = False  # not supported in Docker
+        else:
+            instance.gui_log_window_enabled = get_value_or_default("gui_log_window_enabled")
+        instance.log_level = loaded_commented_yaml.get("log_level", loaded_commented_yaml.get("gui_log_level", logging.INFO))
+        instance.web_dashboard = get_value_or_default("web_dashboard")
+        instance.web_dashboard_open_on_launch = get_value_or_default("web_dashboard_open_on_launch")
+        instance.tool_timeout = get_value_or_default("tool_timeout")
+        instance.trace_lsp_communication = get_value_or_default("trace_lsp_communication")
+        instance.excluded_tools = get_value_or_default("excluded_tools")
+        instance.included_optional_tools = get_value_or_default("included_optional_tools")
+        instance.token_count_estimator = get_value_or_default("token_count_estimator")
+        instance.default_max_tool_answer_chars = get_value_or_default("default_max_tool_answer_chars")
+        instance.ls_specific_settings = get_value_or_default("ls_specific_settings")
 
         # determine language backend
         language_backend = get_dataclass_default(SerenaConfig, "language_backend")
@@ -607,22 +598,6 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
                     language_backend = LanguageBackend.JETBRAINS
                 del loaded_commented_yaml["jetbrains"]
         instance.language_backend = language_backend
-
-        # set other configuration parameters (primitive types)
-        instance.gui_log_window_enabled = get_value_or_default("gui_log_window_enabled")
-        instance.web_dashboard_listen_address = get_value_or_default("web_dashboard_listen_address")
-        instance.log_level = loaded_commented_yaml.get("log_level", loaded_commented_yaml.get("gui_log_level", logging.INFO))
-        instance.web_dashboard = get_value_or_default("web_dashboard")
-        instance.web_dashboard_open_on_launch = get_value_or_default("web_dashboard_open_on_launch")
-        instance.jetbrains_plugin_server_address = get_value_or_default("jetbrains_plugin_server_address")
-        instance.tool_timeout = get_value_or_default("tool_timeout")
-        instance.trace_lsp_communication = get_value_or_default("trace_lsp_communication")
-        instance.excluded_tools = get_value_or_default("excluded_tools")
-        instance.included_optional_tools = get_value_or_default("included_optional_tools")
-        instance.token_count_estimator = get_value_or_default("token_count_estimator")
-        instance.default_max_tool_answer_chars = get_value_or_default("default_max_tool_answer_chars")
-        instance.ls_specific_settings = get_value_or_default("ls_specific_settings")
->>>>>>> upstream/main
 
         # re-save the configuration file if any migrations were performed
         if num_migrations > 0:

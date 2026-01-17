@@ -309,19 +309,16 @@ markers = [
   "fortran: language server running for Fortran",
   "haskell: Haskell language server tests",
   "yaml: language server running for YAML",
-<<<<<<< HEAD
   "solidity: language server running for Solidity",
   "vyper: language server running for Vyper",
   "move: language server running for Move (Aptos/Diem)",
   "sui_move: language server running for Sui Move",
   "cairo: language server running for Cairo",
-=======
   "powershell: language server running for PowerShell",
   "pascal: language server running for Pascal (Free Pascal/Lazarus)",
   "slow: tests that require additional Expert instances and have long startup times (~60-90s each)",
   "toml: language server running for TOML",
   "matlab: language server running for MATLAB (requires MATLAB R2021b+)",
->>>>>>> upstream/main
 ]
 
 [tool.codespell]
@@ -329,8 +326,4 @@ markers = [
 skip = '.git*,*.svg,*.lock,*.min.*'
 check-hidden = true
 # ignore-regex = ''
-<<<<<<< HEAD
-# ignore-words-list = ''
-=======
 ignore-words-list = 'paket'
->>>>>>> upstream/main
