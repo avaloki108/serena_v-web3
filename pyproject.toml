@@ -25,7 +25,7 @@ dependencies = [
   "pydantic>=2.10.6",
   "types-pyyaml>=6.0.12.20241230",
   "pyyaml>=6.0.2",
-  "ruamel.yaml>=0.18.0",
+  "ruamel.yaml==0.18.14",
   "jinja2>=3.1.6",
   "dotenv>=0.9.9",
   "pathspec>=0.12.1",
@@ -35,6 +35,7 @@ dependencies = [
   "tqdm>=4.67.1",
   "tiktoken>=0.9.0",
   "anthropic>=0.54.0",
+  "beautifulsoup4>=4.14.2",
 ]
 
 [[tool.uv.index]]
@@ -72,6 +73,7 @@ dev = [
   "jupyter-book>=1,<2",
   "nbsphinx",
   "pyinstrument",
+  "pytest-timeout>=2.4.0",
 ]
 agno = ["agno>=2.2.1", "sqlalchemy>=2.0.40"]
 google = ["google-genai>=1.8.0"]
@@ -116,6 +118,13 @@ exclude = "^build/|^docs/"
 
 [tool.poe.env]
 PYDEVD_DISABLE_FILE_VALIDATION = "1"
+
+[tool.poe.executor]
+# This is important when using poe with uv, because otherwise poe will try to run commands through
+# uv, which in turn will try to recreate the environment, which in turn will fail if any process
+# using the environment is already running! Naturally, processes using the env are running all the
+# time (e.g. a Serena MCP server), so using the default executor (uv) is not an option!
+type = "simple"
 
 [tool.poe.tasks]
 # Uses PYTEST_MARKERS env var for default markers
@@ -273,6 +282,7 @@ markers = [
   "go: language server running for Go",
   "java: language server running for Java",
   "kotlin: language server running for kotlin",
+  "groovy: language server running for Groovy",
   "rust: language server running for Rust",
   "typescript: language server running for TypeScript",
   "php: language server running for PHP",
@@ -299,11 +309,19 @@ markers = [
   "fortran: language server running for Fortran",
   "haskell: Haskell language server tests",
   "yaml: language server running for YAML",
+<<<<<<< HEAD
   "solidity: language server running for Solidity",
   "vyper: language server running for Vyper",
   "move: language server running for Move (Aptos/Diem)",
   "sui_move: language server running for Sui Move",
   "cairo: language server running for Cairo",
+=======
+  "powershell: language server running for PowerShell",
+  "pascal: language server running for Pascal (Free Pascal/Lazarus)",
+  "slow: tests that require additional Expert instances and have long startup times (~60-90s each)",
+  "toml: language server running for TOML",
+  "matlab: language server running for MATLAB (requires MATLAB R2021b+)",
+>>>>>>> upstream/main
 ]
 
 [tool.codespell]
@@ -311,4 +329,8 @@ markers = [
 skip = '.git*,*.svg,*.lock,*.min.*'
 check-hidden = true
 # ignore-regex = ''
+<<<<<<< HEAD
 # ignore-words-list = ''
+=======
+ignore-words-list = 'paket'
+>>>>>>> upstream/main

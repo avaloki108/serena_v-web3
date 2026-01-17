@@ -5,10 +5,11 @@ The Serena Model Context Protocol (MCP) Server
 import dataclasses
 import os
 import shutil
-from collections.abc import Iterable
+from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Self, TypeVar
@@ -69,6 +70,10 @@ class SerenaPaths:
         """
         the path to the user's custom prompt templates directory
         """
+        self.news_snippet_id_file: str = os.path.join(self.serena_user_home_dir, "last_read_news_snippet_id.txt")
+        """
+        file containing the ID of the last read news snippet
+        """
 
     def get_next_log_file_path(self, prefix: str) -> str:
         """
@@ -84,8 +89,32 @@ class SerenaPaths:
 
 @dataclass
 class ToolInclusionDefinition:
-    excluded_tools: Iterable[str] = ()
-    included_optional_tools: Iterable[str] = ()
+    """
+    Defines which tools to include/exclude in Serena's operation.
+    This can mean either
+      * defining exclusions/inclusions to apply to an existing set of tools [incremental mode], or
+      * defining a fixed set of tools to use [fixed mode].
+    """
+
+    excluded_tools: Sequence[str] = ()
+    """
+    the names of tools to exclude from use [incremental mode]
+    """
+    included_optional_tools: Sequence[str] = ()
+    """
+    the names of optional tools to include [incremental mode]
+    """
+    fixed_tools: Sequence[str] = ()
+    """
+    the names of tools to use as a fixed set of tools [fixed mode]
+    """
+
+    def is_fixed_tool_set(self) -> bool:
+        num_fixed = len(self.fixed_tools)
+        num_incremental = len(self.excluded_tools) + len(self.included_optional_tools)
+        if num_fixed > 0 and num_incremental > 0:
+            raise ValueError("Cannot use both fixed_tools and excluded_tools/included_optional_tools at the same time.")
+        return num_fixed > 0
 
 
 class SerenaConfigError(Exception):
@@ -96,6 +125,7 @@ def get_serena_managed_in_project_dir(project_root: str | Path) -> str:
     return os.path.join(project_root, SERENA_MANAGED_DIR_NAME)
 
 
+<<<<<<< HEAD
 def is_running_in_docker() -> bool:
     """Check if we're running inside a Docker container."""
     # Check for Docker-specific files
@@ -107,6 +137,26 @@ def is_running_in_docker() -> bool:
             return "docker" in f.read()
     except FileNotFoundError:
         return False
+=======
+class LanguageBackend(Enum):
+    LSP = "LSP"
+    """
+    Use the language server protocol (LSP), spawning freely available language servers
+    via the SolidLSP library that is part of Serena
+    """
+    JETBRAINS = "JetBrains"
+    """
+    Use the Serena plugin in your JetBrains IDE.
+    (requires the plugin to be installed and the project being worked on to be open in your IDE)
+    """
+
+    @staticmethod
+    def from_str(backend_str: str) -> "LanguageBackend":
+        for backend in LanguageBackend:
+            if backend.value.lower() == backend_str.lower():
+                return backend
+        raise ValueError(f"Unknown language backend '{backend_str}': valid values are {[b.value for b in LanguageBackend]}")
+>>>>>>> upstream/main
 
 
 @dataclass(kw_only=True)
@@ -148,10 +198,13 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
         if not project_root.exists():
             raise FileNotFoundError(f"Project root not found: {project_root}")
         with LogTime("Project configuration auto-generation", logger=log):
+            log.info("Project root: %s", project_root)
             project_name = project_name or project_root.name
             if languages is None:
                 # determine languages automatically
+                log.info("Determining programming languages used in the project")
                 language_composition = determine_programming_language_composition(str(project_root))
+                log.info("Language composition: %s", language_composition)
                 if len(language_composition) == 0:
                     language_values = ", ".join([lang.value for lang in Language])
                     raise ValueError(
@@ -184,6 +237,7 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
                         if enable:
                             languages_to_use.append(lang)
                     print()
+<<<<<<< HEAD
 
                 # Check if this is a Web3 project and add Web3 languages
                 web3_languages = {"solidity", "vyper", "move", "sui_move", "cairo"}
@@ -199,13 +253,18 @@ class ProjectConfig(ToolInclusionDefinition, ToStringMixin):
                     for essential_lang in ["typescript", "python"]:
                         if essential_lang not in languages_to_use:
                             languages_to_use.append(essential_lang)
+=======
+                log.info("Using languages: %s", languages_to_use)
+>>>>>>> upstream/main
             else:
                 languages_to_use = [lang.value for lang in languages]
             config_with_comments = cls.load_commented_map(PROJECT_TEMPLATE_FILE)
             config_with_comments["project_name"] = project_name
             config_with_comments["languages"] = languages_to_use
             if save_to_disk:
-                save_yaml(cls.path_to_project_yml(project_root), config_with_comments, preserve_comments=True)
+                project_yml_path = cls.path_to_project_yml(project_root)
+                log.info("Saving project configuration to %s", project_yml_path)
+                save_yaml(project_yml_path, config_with_comments, preserve_comments=True)
             return cls._from_dict(config_with_comments)
 
     @classmethod
@@ -369,17 +428,16 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
     trace_lsp_communication: bool = False
     web_dashboard: bool = True
     web_dashboard_listen_address: str = "127.0.0.1"
+<<<<<<< HEAD
     web_dashboard_open_on_launch: bool = True
+=======
+    jetbrains_plugin_server_address: str = "127.0.0.1"
+>>>>>>> upstream/main
     tool_timeout: float = DEFAULT_TOOL_TIMEOUT
-    loaded_commented_yaml: CommentedMap | None = None
-    config_file_path: str | None = None
+
+    language_backend: LanguageBackend = LanguageBackend.LSP
     """
-    the path to the configuration file to which updates of the configuration shall be saved;
-    if None, the configuration is not saved to disk
-    """
-    jetbrains: bool = False
-    """
-    whether to apply JetBrains mode
+    the language backend to use for code understanding features
     """
 
     token_count_estimator: str = RegisteredTokenCountEstimator.CHAR_COUNT.name
@@ -398,8 +456,34 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
     ls_specific_settings: dict = field(default_factory=dict)
     """Advanced configuration option allowing to configure language server implementation specific options, see SolidLSPSettings for more info."""
 
+    # *** fields that are NOT mapped to/from the configuration file ***
+
+    _loaded_commented_yaml: CommentedMap | None = None
+    _config_file_path: str | None = None
+    """
+    the path to the configuration file to which updates of the configuration shall be saved;
+    if None, the configuration is not saved to disk
+    """
+
+    # *** static members ***
+
     CONFIG_FILE = "serena_config.yml"
+<<<<<<< HEAD
     CONFIG_FILE_DOCKER = "serena_config.docker.yml"  # Docker-specific config file; auto-generated if missing, mounted via docker-compose for user customization
+=======
+    CONFIG_FILE_RENAMED_KEYS = {
+        "gui_log_window_enabled": "gui_log_window",
+    }
+    """
+    maps attributes to the keys used in the configuration file, in case they differ
+    """
+
+    # *** methods ***
+
+    @property
+    def config_file_path(self) -> str | None:
+        return self._config_file_path
+>>>>>>> upstream/main
 
     def _tostring_includes(self) -> list[str]:
         return ["config_file_path"]
@@ -457,7 +541,7 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
             raise ValueError(f"Error loading Serena configuration from {config_file_path}: {e}") from e
 
         # create the configuration instance
-        instance = cls(loaded_commented_yaml=loaded_commented_yaml, config_file_path=config_file_path)
+        instance = cls(_loaded_commented_yaml=loaded_commented_yaml, _config_file_path=config_file_path)
 
         # read projects
         if "projects" not in loaded_commented_yaml:
@@ -465,7 +549,7 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
 
         # load list of known projects
         instance.projects = []
-        num_project_migrations = 0
+        num_migrations = 0
         for path in loaded_commented_yaml["projects"]:
             path = Path(path).resolve()
             if not path.exists() or (path.is_dir() and not (path / ProjectConfig.rel_path_to_project_yml()).exists()):
@@ -475,7 +559,7 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
                 path = cls._migrate_out_of_project_config_file(path)
                 if path is None:
                     continue
-                num_project_migrations += 1
+                num_migrations += 1
             project_config = ProjectConfig.load(path)
             project = RegisteredProject(
                 project_root=str(path),
@@ -483,6 +567,7 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
             )
             instance.projects.append(project)
 
+<<<<<<< HEAD
         # set other configuration parameters
         if is_running_in_docker():
             instance.gui_log_window_enabled = False  # not supported in Docker
@@ -501,12 +586,47 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
         )
         instance.default_max_tool_answer_chars = loaded_commented_yaml.get("default_max_tool_answer_chars", 150_000)
         instance.ls_specific_settings = loaded_commented_yaml.get("ls_specific_settings", {})
+=======
+        def get_value_or_default(field_name: str) -> Any:
+            key = cls.CONFIG_FILE_RENAMED_KEYS.get(field_name, field_name)
+            nonlocal num_migrations
+            if key not in loaded_commented_yaml:
+                num_migrations += 1
+            return loaded_commented_yaml.get(key, get_dataclass_default(SerenaConfig, field_name))
+
+        # determine language backend
+        language_backend = get_dataclass_default(SerenaConfig, "language_backend")
+        if "language_backend" in loaded_commented_yaml:
+            backend_str = loaded_commented_yaml["language_backend"]
+            language_backend = LanguageBackend.from_str(backend_str)
+        else:
+            # backward compatibility (migrate Boolean field "jetbrains")
+            if "jetbrains" in loaded_commented_yaml:
+                num_migrations += 1
+                if loaded_commented_yaml["jetbrains"]:
+                    language_backend = LanguageBackend.JETBRAINS
+                del loaded_commented_yaml["jetbrains"]
+        instance.language_backend = language_backend
+
+        # set other configuration parameters (primitive types)
+        instance.gui_log_window_enabled = get_value_or_default("gui_log_window_enabled")
+        instance.web_dashboard_listen_address = get_value_or_default("web_dashboard_listen_address")
+        instance.log_level = loaded_commented_yaml.get("log_level", loaded_commented_yaml.get("gui_log_level", logging.INFO))
+        instance.web_dashboard = get_value_or_default("web_dashboard")
+        instance.web_dashboard_open_on_launch = get_value_or_default("web_dashboard_open_on_launch")
+        instance.jetbrains_plugin_server_address = get_value_or_default("jetbrains_plugin_server_address")
+        instance.tool_timeout = get_value_or_default("tool_timeout")
+        instance.trace_lsp_communication = get_value_or_default("trace_lsp_communication")
+        instance.excluded_tools = get_value_or_default("excluded_tools")
+        instance.included_optional_tools = get_value_or_default("included_optional_tools")
+        instance.token_count_estimator = get_value_or_default("token_count_estimator")
+        instance.default_max_tool_answer_chars = get_value_or_default("default_max_tool_answer_chars")
+        instance.ls_specific_settings = get_value_or_default("ls_specific_settings")
+>>>>>>> upstream/main
 
         # re-save the configuration file if any migrations were performed
-        if num_project_migrations > 0:
-            log.info(
-                f"Migrated {num_project_migrations} project configurations from legacy format to in-project configuration; re-saving configuration"
-            )
+        if num_migrations > 0:
+            log.info("Legacy configuration was migrated; re-saving configuration file")
             instance.save()
 
         return instance
@@ -609,9 +729,32 @@ class SerenaConfig(ToolInclusionDefinition, ToStringMixin):
         """
         if self.config_file_path is None:
             return
-        assert self.loaded_commented_yaml is not None, "Cannot save configuration without loaded YAML"
-        loaded_original_yaml = deepcopy(self.loaded_commented_yaml)
-        # projects are unique absolute paths
-        # we also canonicalize them before saving
+
+        assert self._loaded_commented_yaml is not None, "Cannot save configuration without loaded YAML"
+
+        loaded_original_yaml = deepcopy(self._loaded_commented_yaml)
+
+        # update fields with current values
+        # iterate over all dataclass fields
+        for field_info in dataclasses.fields(self):
+            field_name = field_info.name
+            if field_name in ["projects", "language_backend"] or field_name.startswith("_"):
+                continue
+            yaml_key = SerenaConfig.CONFIG_FILE_RENAMED_KEYS.get(field_name, field_name)
+            loaded_original_yaml[yaml_key] = getattr(self, field_name)
+
+        # convert project objects into list of paths
         loaded_original_yaml["projects"] = sorted({str(project.project_root) for project in self.projects})
+
+        # convert language backend to string
+        loaded_original_yaml["language_backend"] = self.language_backend.value
+
         save_yaml(self.config_file_path, loaded_original_yaml, preserve_comments=True)
+
+    def propagate_settings(self) -> None:
+        """
+        Propagate settings from this configuration to individual components that are statically configured
+        """
+        from serena.tools import JetBrainsPluginClient
+
+        JetBrainsPluginClient.set_server_address(self.jetbrains_plugin_server_address)

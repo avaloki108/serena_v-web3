@@ -3,6 +3,13 @@
 In the following, we provide general instructions on how to connect Serena to your MCP-enabled client,
 as well as specific instructions for popular clients.
 
+:::{note}
+The configurations we provide for particular clients below will run the latest version of Serena
+using the `stdio` protocol with `uvx`.  
+Adapt the commands to your preferred way of [running Serena](020_running), adding any additional
+command-line arguments as needed.
+:::
+
 (clients-general-instructions)=
 ## General Instructions
 
@@ -13,6 +20,8 @@ To connect Serena to your favourite client, simply
 2. add a new MCP server entry by specifying either
     * a [run command](start-mcp-server) that allows the client to start the MCP server in stdio mode as a subprocess, or
     * the URL of the HTTP/SSE endpoint, having started the [Serena MCP server in HTTP/SSE mode](streamable-http) beforehand.
+
+Find concrete examples for popular clients below.
 
 Depending on your needs, you might want to further customize Serena's behaviour by
 * [adding command-line arguments](mcp-args)
@@ -62,20 +71,12 @@ object, e.g.
 }
 ```
 
-## Specific Clients
-
-:::{note}
-In this section, we present example configurations that run the latest version of Serena
-using the `stdio` protocol with `uvx`.  
-Adapt the commands to your preferred way of [running Serena](020_running), adding any additional
-command-line arguments as needed.
-:::
-
-### Claude Code
+## Claude Code
 
 Serena is a great way to make Claude Code both cheaper and more powerful!
 
-From your project directory, add serena with a command like this,
+**Per-Project Configuration.** To add the Serena MCP server to the current project in the current directory, 
+use this command:
 
 ```shell
 claude mcp add serena -- uvx --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project "$(pwd)"
@@ -88,8 +89,33 @@ Note:
     that Serena is configured to work on the current project from the get-go, following 
     Claude Code's mode of operation.
 
+**Global Configuration**. Alternatively, use `--project-from-cwd` for user-level configuration that works across all projects:
 
-### VSCode
+```shell
+claude mcp add --scope user serena -- uvx --from git+https://github.com/oraios/serena serena start-mcp-server --context=claude-code --project-from-cwd
+```
+
+Whenever you start Claude Code, Serena will search up from the current directory for `.serena/project.yml` or `.git` markers,
+activating the current directory as the project if neither is found. 
+This mechanism makes it suitable for a single global MCP configuration.
+
+**Maximum Token Efficiency.** To maximize token efficiency, you may want to use Claude Code's 
+*on-demand tool loading* feature, which is supported since at least v2.0.74 of Claude Code.
+This feature avoids sending all tool descriptions to Claude upon startup, thus saving tokens.
+Instead, Claude will search for tools as needed (but there are no guarantees that it will 
+search optimally, of course).
+To enable this feature, set the environment variable `ENABLE_TOOL_SEARCH=true`.  
+Depending on your shell, you can also set this on a per-session basis, e.g. using
+```shell
+ENABLE_TOOL_SEARCH=true claude
+```
+in bash/zsh, or using
+```shell
+set ENABLE_TOOL_SEARCH=true && claude
+```
+in Windows CMD to launch Claude Code.
+
+## VSCode
 
 While serena can be directly installed from the GitHub MCP server registry, we recommend to set it up manually
 (at least for now, until the configuration there has been improved). Just paste the following into
@@ -117,7 +143,7 @@ While serena can be directly installed from the GitHub MCP server registry, we r
 }
 ```
 
-### Codex
+## Codex
 
 Serena works with OpenAI's Codex CLI out of the box, but you have to use the `codex` context for it to work properly. (The technical reason is that Codex doesn't fully support the MCP specifications, so some massaging of tools is required.).
 
@@ -145,7 +171,7 @@ that was already taken).
 
 > Codex will often show the tools as `failed` even though they are successfully executed. This is not a problem, seems to be a bug in Codex. Despite the error message, everything works as expected.
 
-### Claude Desktop
+## Claude Desktop
 
 On Windows and macOS, there are official [Claude Desktop applications by Anthropic](https://claude.ai/download); for Linux, there is an [open-source
 community version](https://github.com/aaddrick/claude-desktop-debian).
@@ -186,7 +212,7 @@ After restarting, you should see Serena's tools in your chat interface (notice t
 For more information on MCP servers with Claude Desktop,
 see [the official quick start guide](https://modelcontextprotocol.io/quickstart/user).
 
-### JetBrains Junie
+## JetBrains Junie
 
 Open Junie, go to the three dots in the top right corner, then Settings / MCP Settings and add Serena to Junie's global
 MCP server configuration:
@@ -212,7 +238,7 @@ MCP server configuration:
 You will have to prompt Junie to "Activate the current project using serena's activation tool" at the
 start of each session.
 
-### JetBrains AI Assistant
+## JetBrains AI Assistant
 
 Here you can set up the more convenient per-project MCP server configuration, as the AI assistant supports specifying
 the launch working directory.
@@ -241,7 +267,7 @@ Go to Settings / Tools / AI Assistant / MCP and add a new **local** configuratio
 
 Then make sure to configure the working directory to be the project root.
 
-### Antigravity
+## Antigravity
 
 :::{warning}
 At the time of writing (12/2025), Antigravity does not seem to work with Serena due to schema validation issues
@@ -270,11 +296,11 @@ Add this configuration:
 }
 ```
 
-### Other Clients
+## Other Clients
 
 For other clients, follow the [general instructions](#clients-general-instructions) above to set up Serena as an MCP server.
 
-#### Terminal-Based Clients
+### Terminal-Based Clients
 
 There are many terminal-based coding assistants that support MCP servers, such as
 
@@ -290,7 +316,7 @@ by writing your own context, modes or prompts to adjust it to the client's respe
 In most cases, the `ide` context is likely to be appropriate for such clients, i.e. add the arguments `--context ide` 
 in order to reduce tool duplication.
 
-#### MCP-Enabled IDEs and Coding Clients (Cline, Roo-Code, Cursor, Windsurf, etc.)
+### MCP-Enabled IDEs and Coding Clients (Cline, Roo-Code, Cursor, Windsurf, etc.)
 
 Most of the popular existing coding assistants (e.g. IDE extensions) and AI-enabled IDEs themselves support connections
 to MCP Servers. Serena generally boosts performance by providing efficient tools for symbolic operations.
@@ -298,7 +324,7 @@ to MCP Servers. Serena generally boosts performance by providing efficient tools
 We generally recommend to use the `ide` context for these integrations by adding the arguments `--context ide` 
 in order to reduce tool duplication.
 
-#### Local GUIs and Agent Frameworks
+### Local GUIs and Agent Frameworks
 
 Over the last months, several technologies have emerged that allow you to run a local GUI client
 and connect it to an MCP server. The respective applications will typically work with Serena out of the box.
