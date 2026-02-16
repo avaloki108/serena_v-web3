@@ -1,0 +1,29 @@
+{
+  "protocol": "lending",
+  "name": "Example Lending Protocol",
+  "version": "1.0.0",
+  "collateralFactor": 0.75,
+  "liquidationIncentive": 1.08,
+  "oracle": "chainlink",
+  "supportedAssets": [
+    {
+      "symbol": "ETH",
+      "address": "0x0000000000000000000000000000000000000000",
+      "collateralFactor": 0.8
+    },
+    {
+      "symbol": "USDC",
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "collateralFactor": 0.85
+    }
+  ],
+  "riskParameters": {
+    "closeFactor": 0.5,
+    "liquidationDiscount": 0.05,
+    "reserveFactor": 0.1
+  },
+  "governance": {
+    "admin": "0x1234567890123456789012345678901234567890",
+    "timelock": 172800
+  }
+}

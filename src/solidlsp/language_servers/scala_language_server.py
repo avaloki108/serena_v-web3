@@ -57,18 +57,15 @@ class ScalaLanguageServer(SolidLanguageServer):
         """
         assert shutil.which("java") is not None, "JDK is not installed or not in PATH."
 
-        metals_version = "1.6.4"
-
         metals_home = os.path.join(cls.ls_resources_dir(solidlsp_settings), "metals-lsp")
         os.makedirs(metals_home, exist_ok=True)
-        metals_executable = os.path.join(metals_home, metals_version, "metals")
+        metals_executable = os.path.join(metals_home, "metals")
         coursier_command_path = shutil.which("coursier")
+        assert coursier_command_path is not None, "coursier is not installed or not in PATH."
         cs_command_path = shutil.which("cs")
-        assert cs_command_path is not None or coursier_command_path is not None, "coursier is not installed or not in PATH."
 
         if not os.path.exists(metals_executable):
             if not cs_command_path:
-                assert coursier_command_path is not None
                 log.info("'cs' command not found. Trying to install it using 'coursier'.")
                 try:
                     log.info("Running 'coursier setup --yes' to install 'cs'...")
@@ -84,8 +81,7 @@ class ScalaLanguageServer(SolidLanguageServer):
                 log.info("'cs' command installed successfully.")
 
             log.info(f"metals executable not found at {metals_executable}, bootstrapping...")
-            subprocess.run(["mkdir", "-p", os.path.join(metals_home, metals_version)], check=True)
-            artifact = f"org.scalameta:metals_2.13:{metals_version}"
+            artifact = "org.scalameta:metals_2.13:1.6.2"
             cmd = [
                 cs_command_path,
                 "bootstrap",

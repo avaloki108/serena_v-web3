@@ -66,16 +66,11 @@ A context is set at startup when launching Serena (e.g., via CLI options for an 
 Serena comes with pre-defined contexts:
 
 * `desktop-app`: Tailored for use with desktop applications like Claude Desktop. This is the default.
-  The full set of Serena's tools is provided, as the application is assumed to have no prior coding-specific capabilities.
-* `claude-code`: Optimized for use with Claude Code, it disables tools that would duplicate Claude Code's built-in capabilities.
-* `codex`: Optimized for use with OpenAI Codex.
-* `ide`: Generic context for IDE assistants/coding agents, e.g. VSCode, Cursor, or Cline, focusing on augmenting existing capabilities.
-  Basic file operations and shell execution are assumed to be handled by the assistant's own capabilities.
 * `agent`: Designed for scenarios where Serena acts as a more autonomous agent, for example, when used with Agno.
+* `ide-assistant`: Optimized for integration into IDEs like VSCode, Cursor, or Cline, focusing on in-editor coding assistance.
+  Choose the context that best matches the type of integration you are using.
 
-Choose the context that best matches the type of integration you are using.
-
-Find the concrete definitions of the above contexts [here](https://github.com/oraios/serena/tree/main/src/serena/resources/config/contexts).
+Find the concrete definitions of these modes [here](https://github.com/oraios/serena/tree/main/src/serena/resources/config/contexts).
 
 Note that the contexts `ide` and `claude-code` are **single-project contexts** (defining `single_project: true`).
 For such contexts, if a project is provided at startup, the set of tools is limited to those required by the project's
@@ -109,9 +104,9 @@ Examples of built-in modes include:
 * `editing`: Optimizes Serena for direct code modification tasks.
 * `interactive`: Suitable for a conversational, back-and-forth interaction style.
 * `one-shot`: Configures Serena for tasks that should be completed in a single response, often used with `planning` for generating reports or initial plans.
-* `no-onboarding`: Skips the initial onboarding process if it's not needed for a particular session but retains the memory tools (assuming initial memories were created externally).
+* `no-onboarding`: Skips the initial onboarding process if it's not needed for a particular session.
 * `onboarding`: Focuses on the project onboarding process.
-* `no-memories`: Disables all memory tools (and tools building on memories such as onboarding tools)  
+* `no-memories`: Disables all memory tools (and tools building on memories auch as onboarding tools)  
 
 Find the concrete definitions of these modes [here](https://github.com/oraios/serena/tree/main/src/serena/resources/config/modes).
 
@@ -342,3 +337,4 @@ prompts:
 ```
 
 It is advisable to use the default prompt as a starting point and modify it to suit your needs.
+>>>>>>> upstream/main

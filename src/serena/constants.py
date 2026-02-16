@@ -4,6 +4,7 @@ _repo_root_path = Path(__file__).parent.parent.parent.resolve()
 _serena_pkg_path = Path(__file__).parent.resolve()
 
 SERENA_MANAGED_DIR_NAME = ".serena"
+SERENA_MANAGED_DIR_IN_HOME = str(Path.home() / SERENA_MANAGED_DIR_NAME)
 
 # TODO: Path-related constants should be moved to SerenaPaths; don't add further constants here.
 REPO_ROOT = str(_repo_root_path)

@@ -19,7 +19,7 @@ dependencies = [
   "fortls>=3.2.2",
   "overrides>=7.7.0,<8",
   "python-dotenv>=1.0.0, <2",
-  "mcp==1.23.0",
+  "mcp==1.12.3",
   "flask>=3.0.0",
   "sensai-utils>=1.5.0",
   "pydantic>=2.10.6",
@@ -134,7 +134,7 @@ type = "simple"
 # Uses PYTEST_MARKERS env var for default markers
 # For custom markers, one can either adjust the env var or just use -m option in the command line,
 # as the second -m option will override the first one.
-test = "pytest test -vv"
+test = "pytest test -vv -m \"${PYTEST_MARKERS:-not rust and not erlang}\""
 _black_check = "black --check src scripts test"
 _ruff_check = "ruff check src scripts test"
 _black_format = "black src scripts test"
@@ -290,7 +290,6 @@ markers = [
   "groovy: language server running for Groovy",
   "rust: language server running for Rust",
   "typescript: language server running for TypeScript",
-  "vue: language server running for Vue (uses TypeScript LSP)",
   "php: language server running for PHP",
   "perl: language server running for Perl",
   "csharp: language server running for C#",
@@ -309,13 +308,17 @@ markers = [
   "erlang: language server running for Erlang",
   "scala: language server running for Scala",
   "al: language server running for AL (Microsoft Dynamics 365 Business Central)",
-  "fsharp: language server running for F#",
   "rego: language server running for Rego",
   "markdown: language server running for Markdown",
   "julia: Julia language server tests",
   "fortran: language server running for Fortran",
   "haskell: Haskell language server tests",
   "yaml: language server running for YAML",
+  "solidity: language server running for Solidity",
+  "vyper: language server running for Vyper",
+  "move: language server running for Move (Aptos/Diem)",
+  "sui_move: language server running for Sui Move",
+  "cairo: language server running for Cairo",
   "powershell: language server running for PowerShell",
   "pascal: language server running for Pascal (Free Pascal/Lazarus)",
   "cpp: language server running for C/C++",
