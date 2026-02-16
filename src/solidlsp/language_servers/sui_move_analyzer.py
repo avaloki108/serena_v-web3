@@ -116,7 +116,6 @@ class SuiMoveAnalyzer(SolidLanguageServer):
     def __init__(
         self,
         config: LanguageServerConfig,
-        logger: LanguageServerLogger,
         repository_root_path: str,
         solidlsp_settings: SolidLSPSettings,
     ):
@@ -124,6 +123,7 @@ class SuiMoveAnalyzer(SolidLanguageServer):
         Creates a SuiMoveAnalyzer instance. This class is not meant to be instantiated directly.
         Use LanguageServer.create() instead.
         """
+        logger = LanguageServerLogger("sui_move")
         analyzer_cmd = self._setup_runtime_dependency(logger)
 
         super().__init__(

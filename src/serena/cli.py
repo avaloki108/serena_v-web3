@@ -1,9 +1,11 @@
+import collections
 import glob
 import json
 import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from logging import Logger
 from pathlib import Path
 from typing import Any, Literal
@@ -11,24 +13,21 @@ from typing import Any, Literal
 import click
 from sensai.util import logging
 from sensai.util.logging import FileLoggerContext, datetime_tag
+from sensai.util.string import dict_string
 from tqdm import tqdm
 
 from serena.agent import SerenaAgent
 from serena.config.context_mode import SerenaAgentContext, SerenaAgentMode
-from serena.config.serena_config import ProjectConfig, SerenaConfig, SerenaPaths
+from serena.config.serena_config import LanguageBackend, ProjectConfig, SerenaConfig, SerenaPaths
 from serena.constants import (
     DEFAULT_CONTEXT,
     DEFAULT_MODES,
-    PROMPT_TEMPLATES_DIR_IN_USER_HOME,
     PROMPT_TEMPLATES_DIR_INTERNAL,
     SERENA_LOG_FORMAT,
-    SERENA_MANAGED_DIR_IN_HOME,
     SERENAS_OWN_CONTEXT_YAMLS_DIR,
     SERENAS_OWN_MODE_YAMLS_DIR,
-    USER_CONTEXT_YAMLS_DIR,
-    USER_MODE_YAMLS_DIR,
 )
-from serena.mcp import SerenaMCPFactory, SerenaMCPFactorySingleProcess
+from serena.mcp import SerenaMCPFactory
 from serena.project import Project
 from serena.tools import FindReferencingSymbolsTool, FindSymbolTool, GetSymbolsOverviewTool, SearchForPatternTool, ToolRegistry
 from serena.util.logging import MemoryLogHandler
@@ -36,6 +35,44 @@ from solidlsp.ls_config import Language
 from solidlsp.util.subprocess_util import subprocess_kwargs
 
 log = logging.getLogger(__name__)
+
+_MAX_CONTENT_WIDTH = 100
+
+
+def find_project_root(root: str | Path | None = None) -> str:
+    """Find project root by walking up from CWD.
+
+    Checks for .serena/project.yml first (explicit Serena project), then .git (git root).
+    Falls back to CWD if no marker is found.
+
+    :param root: If provided, constrains the search to this directory and below
+                 (acts as a virtual filesystem root). Search stops at this boundary.
+    :return: absolute path to project root (falls back to CWD if no marker found)
+    """
+    current = Path.cwd().resolve()
+    boundary = Path(root).resolve() if root is not None else None
+
+    def ancestors() -> Iterator[Path]:
+        """Yield current directory and ancestors up to boundary."""
+        yield current
+        for parent in current.parents:
+            yield parent
+            if boundary is not None and parent == boundary:
+                return
+
+    # First pass: look for .serena
+    for directory in ancestors():
+        if (directory / ".serena" / "project.yml").is_file():
+            return str(directory)
+
+    # Second pass: look for .git
+    for directory in ancestors():
+        if (directory / ".git").exists():  # .git can be file (worktree) or dir
+            return str(directory)
+
+    # Fall back to CWD
+    return str(current)
+
 
 # --------------------- Utilities -------------------------------------
 
@@ -103,7 +140,7 @@ class TopLevelCommands(AutoRegisteringGroup):
         super().__init__(name="serena", help="Serena CLI commands. You can run `<command> --help` for more info on each command.")
 
     @staticmethod
-    @click.command("start-mcp-server", help="Starts the Serena MCP server.")
+    @click.command("start-mcp-server", help="Starts the Serena MCP server.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.option("--project", "project", type=PROJECT_TYPE, default=None, help="Path or name of project to activate at startup.")
     @click.option("--project-file", "project", type=PROJECT_TYPE, default=None, help="[DEPRECATED] Use --project instead.")
     @click.argument("project_file_arg", type=PROJECT_TYPE, required=False, default=None, metavar="")
@@ -120,16 +157,51 @@ class TopLevelCommands(AutoRegisteringGroup):
         help="Built-in mode names or paths to custom mode YAMLs.",
     )
     @click.option(
+        "--language-backend",
+        type=click.Choice([lb.value for lb in LanguageBackend]),
+        default=None,
+        help="Override the configured language backend.",
+    )
+    @click.option(
         "--transport",
         type=click.Choice(["stdio", "sse", "streamable-http"]),
         default="stdio",
         show_default=True,
         help="Transport protocol.",
     )
-    @click.option("--host", type=str, default="0.0.0.0", show_default=True)
-    @click.option("--port", type=int, default=8000, show_default=True)
-    @click.option("--enable-web-dashboard", type=bool, is_flag=False, default=None, help="Override dashboard setting in config.")
-    @click.option("--enable-gui-log-window", type=bool, is_flag=False, default=None, help="Override GUI log window setting in config.")
+    @click.option(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        show_default=True,
+        help="Listen address for the MCP server (when using corresponding transport).",
+    )
+    @click.option(
+        "--port", type=int, default=8000, show_default=True, help="Listen port for the MCP server (when using corresponding transport)."
+    )
+    @click.option(
+        "--enable-web-dashboard",
+        type=bool,
+        is_flag=False,
+        default=None,
+        help="Enable the web dashboard (overriding the setting in Serena's config). "
+        "It is recommended to always enable the dashboard. If you don't want the browser to open on startup, set open-web-dashboard to False. "
+        "For more information, see\nhttps://oraios.github.io/serena/02-usage/060_dashboard.html",
+    )
+    @click.option(
+        "--enable-gui-log-window",
+        type=bool,
+        is_flag=False,
+        default=None,
+        help="Enable the gui log window (currently only displays logs; overriding the setting in Serena's config).",
+    )
+    @click.option(
+        "--open-web-dashboard",
+        type=bool,
+        is_flag=False,
+        default=None,
+        help="Open Serena's dashboard in your browser after MCP server startup (overriding the setting in Serena's config).",
+    )
     @click.option(
         "--log-level",
         type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]),
@@ -138,15 +210,24 @@ class TopLevelCommands(AutoRegisteringGroup):
     )
     @click.option("--trace-lsp-communication", type=bool, is_flag=False, default=None, help="Whether to trace LSP communication.")
     @click.option("--tool-timeout", type=float, default=None, help="Override tool execution timeout in config.")
+    @click.option(
+        "--project-from-cwd",
+        is_flag=True,
+        default=False,
+        help="Auto-detect project from current working directory (searches for .serena/project.yml or .git, falls back to CWD). Intended for CLI-based agents like Claude Code, Gemini and Codex.",
+    )
     def start_mcp_server(
         project: str | None,
         project_file_arg: str | None,
+        project_from_cwd: bool | None,
         context: str,
         modes: tuple[str, ...],
+        language_backend: str | None,
         transport: Literal["stdio", "sse", "streamable-http"],
         host: str,
         port: int,
         enable_web_dashboard: bool | None,
+        open_web_dashboard: bool | None,
         enable_gui_log_window: bool | None,
         log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] | None,
         trace_lsp_communication: bool | None,
@@ -171,13 +252,23 @@ class TopLevelCommands(AutoRegisteringGroup):
 
         log.info("Initializing Serena MCP server")
         log.info("Storing logs in %s", log_path)
+
+        # Handle --project-from-cwd flag
+        if project_from_cwd:
+            if project is not None or project_file_arg is not None:
+                raise click.UsageError("--project-from-cwd cannot be used with --project or positional project argument")
+            project = find_project_root()
+            log.info("Auto-detected project root: %s", project)
+
         project_file = project_file_arg or project
-        factory = SerenaMCPFactorySingleProcess(context=context, project=project_file, memory_log_handler=memory_log_handler)
+        factory = SerenaMCPFactory(context=context, project=project_file, memory_log_handler=memory_log_handler)
         server = factory.create_mcp_server(
             host=host,
             port=port,
             modes=modes,
+            language_backend=LanguageBackend.from_str(language_backend) if language_backend else None,
             enable_web_dashboard=enable_web_dashboard,
+            open_web_dashboard=open_web_dashboard,
             enable_gui_log_window=enable_gui_log_window,
             log_level=log_level,
             trace_lsp_communication=trace_lsp_communication,
@@ -192,7 +283,9 @@ class TopLevelCommands(AutoRegisteringGroup):
         server.run(transport=transport)
 
     @staticmethod
-    @click.command("print-system-prompt", help="Print the system prompt for a project.")
+    @click.command(
+        "print-system-prompt", help="Print the system prompt for a project.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH}
+    )
     @click.argument("project", type=click.Path(exists=True), default=os.getcwd(), required=False)
     @click.option(
         "--log-level",
@@ -243,7 +336,7 @@ class ModeCommands(AutoRegisteringGroup):
         super().__init__(name="mode", help="Manage Serena modes. You can run `mode <command> --help` for more info on each command.")
 
     @staticmethod
-    @click.command("list", help="List available modes.")
+    @click.command("list", help="List available modes.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     def list() -> None:
         mode_names = SerenaAgentMode.list_registered_mode_names()
         max_len_name = max(len(name) for name in mode_names) if mode_names else 20
@@ -255,7 +348,7 @@ class ModeCommands(AutoRegisteringGroup):
             click.echo(name_descr_string)
 
     @staticmethod
-    @click.command("create", help="Create a new mode or copy an internal one.")
+    @click.command("create", help="Create a new mode or copy an internal one.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.option(
         "--name",
         "-n",
@@ -268,7 +361,7 @@ class ModeCommands(AutoRegisteringGroup):
         if not (name or from_internal):
             raise click.UsageError("Provide at least one of --name or --from-internal.")
         mode_name = name or from_internal
-        dest = os.path.join(USER_MODE_YAMLS_DIR, f"{mode_name}.yml")
+        dest = os.path.join(SerenaPaths().user_modes_dir, f"{mode_name}.yml")
         src = (
             os.path.join(SERENAS_OWN_MODE_YAMLS_DIR, f"{from_internal}.yml")
             if from_internal
@@ -284,10 +377,10 @@ class ModeCommands(AutoRegisteringGroup):
         _open_in_editor(dest)
 
     @staticmethod
-    @click.command("edit", help="Edit a custom mode YAML file.")
+    @click.command("edit", help="Edit a custom mode YAML file.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.argument("mode_name")
     def edit(mode_name: str) -> None:
-        path = os.path.join(USER_MODE_YAMLS_DIR, f"{mode_name}.yml")
+        path = os.path.join(SerenaPaths().user_modes_dir, f"{mode_name}.yml")
         if not os.path.exists(path):
             if mode_name in SerenaAgentMode.list_registered_mode_names(include_user_modes=False):
                 click.echo(
@@ -300,10 +393,10 @@ class ModeCommands(AutoRegisteringGroup):
         _open_in_editor(path)
 
     @staticmethod
-    @click.command("delete", help="Delete a custom mode file.")
+    @click.command("delete", help="Delete a custom mode file.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.argument("mode_name")
     def delete(mode_name: str) -> None:
-        path = os.path.join(USER_MODE_YAMLS_DIR, f"{mode_name}.yml")
+        path = os.path.join(SerenaPaths().user_modes_dir, f"{mode_name}.yml")
         if not os.path.exists(path):
             click.echo(f"Custom mode '{mode_name}' not found.")
             return
@@ -320,7 +413,7 @@ class ContextCommands(AutoRegisteringGroup):
         )
 
     @staticmethod
-    @click.command("list", help="List available contexts.")
+    @click.command("list", help="List available contexts.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     def list() -> None:
         context_names = SerenaAgentContext.list_registered_context_names()
         max_len_name = max(len(name) for name in context_names) if context_names else 20
@@ -332,7 +425,9 @@ class ContextCommands(AutoRegisteringGroup):
             click.echo(name_descr_string)
 
     @staticmethod
-    @click.command("create", help="Create a new context or copy an internal one.")
+    @click.command(
+        "create", help="Create a new context or copy an internal one.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH}
+    )
     @click.option(
         "--name",
         "-n",
@@ -345,7 +440,7 @@ class ContextCommands(AutoRegisteringGroup):
         if not (name or from_internal):
             raise click.UsageError("Provide at least one of --name or --from-internal.")
         ctx_name = name or from_internal
-        dest = os.path.join(USER_CONTEXT_YAMLS_DIR, f"{ctx_name}.yml")
+        dest = os.path.join(SerenaPaths().user_contexts_dir, f"{ctx_name}.yml")
         src = (
             os.path.join(SERENAS_OWN_CONTEXT_YAMLS_DIR, f"{from_internal}.yml")
             if from_internal
@@ -361,10 +456,10 @@ class ContextCommands(AutoRegisteringGroup):
         _open_in_editor(dest)
 
     @staticmethod
-    @click.command("edit", help="Edit a custom context YAML file.")
+    @click.command("edit", help="Edit a custom context YAML file.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.argument("context_name")
     def edit(context_name: str) -> None:
-        path = os.path.join(USER_CONTEXT_YAMLS_DIR, f"{context_name}.yml")
+        path = os.path.join(SerenaPaths().user_contexts_dir, f"{context_name}.yml")
         if not os.path.exists(path):
             if context_name in SerenaAgentContext.list_registered_context_names(include_user_contexts=False):
                 click.echo(
@@ -377,10 +472,10 @@ class ContextCommands(AutoRegisteringGroup):
         _open_in_editor(path)
 
     @staticmethod
-    @click.command("delete", help="Delete a custom context file.")
+    @click.command("delete", help="Delete a custom context file.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.argument("context_name")
     def delete(context_name: str) -> None:
-        path = os.path.join(USER_CONTEXT_YAMLS_DIR, f"{context_name}.yml")
+        path = os.path.join(SerenaPaths().user_contexts_dir, f"{context_name}.yml")
         if not os.path.exists(path):
             click.echo(f"Custom context '{context_name}' not found.")
             return
@@ -396,13 +491,14 @@ class SerenaConfigCommands(AutoRegisteringGroup):
 
     @staticmethod
     @click.command(
-        "edit", help="Edit serena_config.yml in your default editor. Will create a config file from the template if no config is found."
+        "edit",
+        help="Edit serena_config.yml in your default editor. Will create a config file from the template if no config is found.",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
     )
     def edit() -> None:
-        config_path = os.path.join(SERENA_MANAGED_DIR_IN_HOME, "serena_config.yml")
-        if not os.path.exists(config_path):
-            SerenaConfig.generate_config_file(config_path)
-        _open_in_editor(config_path)
+        serena_config = SerenaConfig.from_config_file()
+        assert serena_config.config_file_path is not None
+        _open_in_editor(serena_config.config_file_path)
 
 
 class ProjectCommands(AutoRegisteringGroup):
@@ -414,17 +510,21 @@ class ProjectCommands(AutoRegisteringGroup):
         )
 
     @staticmethod
-    @click.command("generate-yml", help="Generate a project.yml file.")
-    @click.argument("project_path", type=click.Path(exists=True, file_okay=False), default=os.getcwd())
-    @click.option(
-        "--language", type=str, multiple=True, help="Programming language(s); inferred if not specified. Can be passed multiple times."
-    )
-    def generate_yml(project_path: str, language: tuple[str, ...]) -> None:
-        from serena.config.web3_config import QdrantConfig
+    def _create_project(project_path: str, name: str | None, language: tuple[str, ...]) -> ProjectConfig:
+        """
+        Helper method to create a project configuration file.
 
+        :param project_path: Path to the project directory
+        :param name: Optional project name (defaults to directory name if not specified)
+        :param language: Tuple of language names
+        :return: The generated ProjectConfig instance
+        :raises FileExistsError: If project.yml already exists
+        :raises ValueError: If an unsupported language is specified
+        """
         yml_path = os.path.join(project_path, ProjectConfig.rel_path_to_project_yml())
         if os.path.exists(yml_path):
             raise FileExistsError(f"Project file {yml_path} already exists.")
+
         languages: list[Language] = []
         if language:
             for lang in language:
@@ -433,23 +533,55 @@ class ProjectCommands(AutoRegisteringGroup):
                 except ValueError:
                     all_langs = [l.value for l in Language]
                     raise ValueError(f"Unknown language '{lang}'. Supported: {all_langs}")
-        generated_conf = ProjectConfig.autogenerate(project_root=project_path, languages=languages if languages else None)
-        # Add default Qdrant configuration
-        generated_conf.qdrant_config = QdrantConfig()
-        # Save the config manually to include qdrant_config
-        from ruamel.yaml.comments import CommentedMap
 
-        from serena.util.general import save_yaml
-
-        config_with_comments = ProjectConfig.load_commented_map(PROJECT_TEMPLATE_FILE)
-        config_with_comments.update(generated_conf.to_yaml_dict())
-        save_yaml(yml_path, config_with_comments, preserve_comments=True)
-        print(f"Generated project.yml with languages {generated_conf.languages} at {yml_path}.")
-        print("Qdrant vector database configuration has been added with default settings.")
+        generated_conf = ProjectConfig.autogenerate(
+            project_root=project_path, project_name=name, languages=languages if languages else None, interactive=True
+        )
+        yml_path = ProjectConfig.path_to_project_yml(project_path)
+        languages_str = ", ".join([lang.value for lang in generated_conf.languages]) if generated_conf.languages else "N/A"
+        click.echo(f"Generated project with languages {{{languages_str}}} at {yml_path}.")
+        return generated_conf
 
     @staticmethod
-    @click.command("index", help="Index a project by saving symbols to the LSP cache.")
+    @click.command("create", help="Create a new Serena project configuration.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
+    @click.argument("project_path", type=click.Path(exists=True, file_okay=False), default=os.getcwd())
+    @click.option("--name", type=str, default=None, help="Project name; defaults to directory name if not specified.")
+    @click.option(
+        "--language", type=str, multiple=True, help="Programming language(s); inferred if not specified. Can be passed multiple times."
+    )
+    @click.option("--index", is_flag=True, help="Index the project after creation.")
+    @click.option(
+        "--log-level",
+        type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]),
+        default="WARNING",
+        help="Log level for indexing (only used if --index is set).",
+    )
+    @click.option("--timeout", type=float, default=10, help="Timeout for indexing a single file (only used if --index is set).")
+    def create(project_path: str, name: str | None, language: tuple[str, ...], index: bool, log_level: str, timeout: float) -> None:
+        try:
+            ProjectCommands._create_project(project_path, name, language)
+            if index:
+                click.echo("Indexing project...")
+                ProjectCommands._index_project(project_path, log_level, timeout=timeout)
+        except FileExistsError as e:
+            raise click.ClickException(f"Project already exists: {e}\nUse 'serena project index' to index an existing project.")
+        except ValueError as e:
+            raise click.ClickException(str(e))
+
+    @staticmethod
+    @click.command(
+        "index",
+        help="Index a project by saving symbols to the LSP cache. Auto-creates project.yml if it doesn't exist.",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
+    )
     @click.argument("project", type=click.Path(exists=True), default=os.getcwd(), required=False)
+    @click.option("--name", type=str, default=None, help="Project name (only used if auto-creating project.yml).")
+    @click.option(
+        "--language",
+        type=str,
+        multiple=True,
+        help="Programming language(s) (only used if auto-creating project.yml). Inferred if not specified.",
+    )
     @click.option(
         "--log-level",
         type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]),
@@ -457,11 +589,25 @@ class ProjectCommands(AutoRegisteringGroup):
         help="Log level for indexing.",
     )
     @click.option("--timeout", type=float, default=10, help="Timeout for indexing a single file.")
-    def index(project: str, log_level: str, timeout: float) -> None:
+    def index(project: str, name: str | None, language: tuple[str, ...], log_level: str, timeout: float) -> None:
+        # Check if project.yml exists, if not auto-create it
+        yml_path = os.path.join(project, ProjectConfig.rel_path_to_project_yml())
+        if not os.path.exists(yml_path):
+            click.echo(f"Project configuration not found at {yml_path}. Auto-creating...")
+            try:
+                ProjectCommands._create_project(project, name, language)
+            except FileExistsError:
+                # Race condition - file was created between check and creation
+                pass
+            except ValueError as e:
+                raise click.ClickException(str(e))
+
         ProjectCommands._index_project(project, log_level, timeout=timeout)
 
     @staticmethod
-    @click.command("index-deprecated", help="Deprecated alias for 'serena project index'.")
+    @click.command(
+        "index-deprecated", help="Deprecated alias for 'serena project index'.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH}
+    )
     @click.argument("project", type=click.Path(exists=True), default=os.getcwd(), required=False)
     @click.option("--log-level", type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]), default="WARNING")
     @click.option("--timeout", type=float, default=10, help="Timeout for indexing a single file.")
@@ -484,23 +630,23 @@ class ProjectCommands(AutoRegisteringGroup):
 
             files = proj.gather_source_files()
 
-            servers = list(ls_mgr.iter_language_servers())
-            for k, ls in enumerate(servers, start=1):
-                click.echo(f"Indexing for language {ls.language.value} ({k}/{len(servers)}) …")
-                collected_exceptions: list[Exception] = []
-                files_failed = []
-                for i, f in enumerate(tqdm(files, desc="Indexing")):
-                    try:
-                        ls.request_document_symbols(f, include_body=False)
-                        ls.request_document_symbols(f, include_body=True)
-                    except Exception as e:
-                        log.error(f"Failed to index {f}, continuing.")
-                        collected_exceptions.append(e)
-                        files_failed.append(f)
-                    if (i + 1) % 10 == 0:
-                        ls.save_cache()
-                ls.save_cache()
-                click.echo(f"Symbols saved to {ls.cache_path}")
+            collected_exceptions: list[Exception] = []
+            files_failed = []
+            language_file_counts: dict[Language, int] = collections.defaultdict(lambda: 0)
+            for i, f in enumerate(tqdm(files, desc="Indexing")):
+                try:
+                    ls = ls_mgr.get_language_server(f)
+                    ls.request_document_symbols(f)
+                    language_file_counts[ls.language] += 1
+                except Exception as e:
+                    log.error(f"Failed to index {f}, continuing.")
+                    collected_exceptions.append(e)
+                    files_failed.append(f)
+                if (i + 1) % 10 == 0:
+                    ls_mgr.save_all_caches()
+            reported_language_file_counts = {k.value: v for k, v in language_file_counts.items()}
+            click.echo(f"Indexed files per language: {dict_string(reported_language_file_counts, brackets=None)}")
+            ls_mgr.save_all_caches()
 
             if len(files_failed) > 0:
                 os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -526,7 +672,11 @@ class ProjectCommands(AutoRegisteringGroup):
             ls_mgr.stop_all()
 
     @staticmethod
-    @click.command("is_ignored_path", help="Check if a path is ignored by the project configuration.")
+    @click.command(
+        "is_ignored_path",
+        help="Check if a path is ignored by the project configuration.",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
+    )
     @click.argument("path", type=click.Path(exists=False, file_okay=True, dir_okay=True))
     @click.argument("project", type=click.Path(exists=True, file_okay=False, dir_okay=True), default=os.getcwd())
     def is_ignored_path(path: str, project: str) -> None:
@@ -543,56 +693,11 @@ class ProjectCommands(AutoRegisteringGroup):
         click.echo(f"Path '{path}' IS {'ignored' if is_ignored else 'IS NOT ignored'} by the project configuration.")
 
     @staticmethod
-    @click.command("search", help="Search code semantically using Qdrant vector database.")
-    @click.argument("query", type=str)
-    @click.argument("project", type=click.Path(exists=True, file_okay=False, dir_okay=True), default=os.getcwd(), required=False)
-    @click.option("--limit", type=int, default=None, help="Maximum number of results to return.")
-    def search(query: str, project: str, limit: int | None) -> None:
-        """
-        Search for code semantically using Qdrant vector database.
-
-        :param query: The search query (natural language or code pattern)
-        :param project: The path to the project directory, defaults to the current working directory
-        :param limit: Maximum number of results to return (uses config default if not specified)
-        """
-        proj = Project.load(os.path.abspath(project))
-
-        if not proj.project_config.qdrant_config or not proj.project_config.qdrant_config.enable_auto_indexing:
-            click.echo("Qdrant is not enabled for this project. Enable it in .serena/project.yml", err=True)
-            exit(1)
-
-        try:
-            from serena.project_indexer import ProjectIndexer
-
-            indexer = ProjectIndexer(proj)
-            click.echo(f"Searching for: {query}")
-            results = indexer.search_in_project(query, limit=limit)
-
-            if not results:
-                click.echo("No results found.")
-                return
-
-            click.echo(f"\nFound {len(results)} results:\n")
-            for i, result in enumerate(results, start=1):
-                score = result.get("score", 0)
-                payload = result.get("payload", {})
-                file_path = payload.get("file_path", "unknown")
-                text = payload.get("text", "")
-
-                click.echo(f"{i}. {file_path} (Score: {score:.3f})")
-                # Show first 200 chars of content
-                preview = text[:200].replace("\n", " ")
-                if len(text) > 200:
-                    preview += "..."
-                click.echo(f"   {preview}\n")
-
-        except Exception as e:
-            click.echo(f"Search failed: {e}", err=True)
-            log.error(f"Qdrant search failed: {e}")
-            exit(1)
-
-    @staticmethod
-    @click.command("index-file", help="Index a single file by saving its symbols to the LSP cache.")
+    @click.command(
+        "index-file",
+        help="Index a single file by saving its symbols to the LSP cache.",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
+    )
     @click.argument("file", type=click.Path(exists=True, file_okay=True, dir_okay=False))
     @click.argument("project", type=click.Path(exists=True, file_okay=False, dir_okay=True), default=os.getcwd())
     @click.option("--verbose", "-v", is_flag=True, help="Print detailed information about the indexed symbols.")
@@ -613,19 +718,23 @@ class ProjectCommands(AutoRegisteringGroup):
         try:
             for ls in ls_mgr.iter_language_servers():
                 click.echo(f"Indexing for language {ls.language.value} …")
-                symbols, _ = ls.request_document_symbols(file, include_body=False)
-                ls.request_document_symbols(file, include_body=True)
+                document_symbols = ls.request_document_symbols(file)
+                symbols, _ = document_symbols.get_all_symbols_and_roots()
                 if verbose:
                     click.echo(f"Symbols in file '{file}':")
                     for symbol in symbols:
                         click.echo(f"  - {symbol['name']} at line {symbol['selectionRange']['start']['line']} of kind {symbol['kind']}")
                 ls.save_cache()
-                click.echo(f"Successfully indexed file '{file}', {len(symbols)} symbols saved to {ls.cache_path}.")
+                click.echo(f"Successfully indexed file '{file}', {len(symbols)} symbols saved to cache in {ls.cache_dir}.")
         finally:
             ls_mgr.stop_all()
 
     @staticmethod
-    @click.command("health-check", help="Perform a comprehensive health check of the project's tools and language server.")
+    @click.command(
+        "health-check",
+        help="Perform a comprehensive health check of the project's tools and language server.",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
+    )
     @click.argument("project", type=click.Path(exists=True, file_okay=False, dir_okay=True), default=os.getcwd())
     def health_check(project: str) -> None:
         """
@@ -780,6 +889,7 @@ class ToolCommands(AutoRegisteringGroup):
     @click.command(
         "list",
         help="Prints an overview of the tools that are active by default (not just the active ones for your project). For viewing all tools, pass `--all / -a`",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
     )
     @click.option("--quiet", "-q", is_flag=True)
     @click.option("--all", "-a", "include_optional", is_flag=True, help="List all tools, including those not enabled by default.")
@@ -802,6 +912,7 @@ class ToolCommands(AutoRegisteringGroup):
     @click.command(
         "description",
         help="Print the description of a tool, optionally with a specific context (the latter may modify the default description).",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
     )
     @click.argument("tool_name", type=str)
     @click.option("--context", type=str, default=None, help="Context name or path to context file.")
@@ -827,11 +938,14 @@ class PromptCommands(AutoRegisteringGroup):
 
     @staticmethod
     def _get_user_prompt_yaml_path(prompt_yaml_name: str) -> str:
-        os.makedirs(PROMPT_TEMPLATES_DIR_IN_USER_HOME, exist_ok=True)
-        return os.path.join(PROMPT_TEMPLATES_DIR_IN_USER_HOME, prompt_yaml_name)
+        templates_dir = SerenaPaths().user_prompt_templates_dir
+        os.makedirs(templates_dir, exist_ok=True)
+        return os.path.join(templates_dir, prompt_yaml_name)
 
     @staticmethod
-    @click.command("list", help="Lists yamls that are used for defining prompts.")
+    @click.command(
+        "list", help="Lists yamls that are used for defining prompts.", context_settings={"max_content_width": _MAX_CONTENT_WIDTH}
+    )
     def list() -> None:
         serena_prompt_yaml_names = [os.path.basename(f) for f in glob.glob(PROMPT_TEMPLATES_DIR_INTERNAL + "/*.yml")]
         for prompt_yaml_name in serena_prompt_yaml_names:
@@ -842,7 +956,11 @@ class PromptCommands(AutoRegisteringGroup):
                 click.echo(prompt_yaml_name)
 
     @staticmethod
-    @click.command("create-override", help="Create an override of an internal prompts yaml for customizing Serena's prompts")
+    @click.command(
+        "create-override",
+        help="Create an override of an internal prompts yaml for customizing Serena's prompts",
+        context_settings={"max_content_width": _MAX_CONTENT_WIDTH},
+    )
     @click.argument("prompt_yaml_name")
     def create_override(prompt_yaml_name: str) -> None:
         """
@@ -860,7 +978,9 @@ class PromptCommands(AutoRegisteringGroup):
         _open_in_editor(user_prompt_yaml_path)
 
     @staticmethod
-    @click.command("edit-override", help="Edit an existing prompt override file")
+    @click.command(
+        "edit-override", help="Edit an existing prompt override file", context_settings={"max_content_width": _MAX_CONTENT_WIDTH}
+    )
     @click.argument("prompt_yaml_name")
     def edit_override(prompt_yaml_name: str) -> None:
         """
@@ -877,17 +997,18 @@ class PromptCommands(AutoRegisteringGroup):
         _open_in_editor(user_prompt_yaml_path)
 
     @staticmethod
-    @click.command("list-overrides", help="List existing prompt override files")
+    @click.command("list-overrides", help="List existing prompt override files", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     def list_overrides() -> None:
-        os.makedirs(PROMPT_TEMPLATES_DIR_IN_USER_HOME, exist_ok=True)
+        user_templates_dir = SerenaPaths().user_prompt_templates_dir
+        os.makedirs(user_templates_dir, exist_ok=True)
         serena_prompt_yaml_names = [os.path.basename(f) for f in glob.glob(PROMPT_TEMPLATES_DIR_INTERNAL + "/*.yml")]
-        override_files = glob.glob(os.path.join(PROMPT_TEMPLATES_DIR_IN_USER_HOME, "*.yml"))
+        override_files = glob.glob(os.path.join(user_templates_dir, "*.yml"))
         for file_path in override_files:
             if os.path.basename(file_path) in serena_prompt_yaml_names:
                 click.echo(file_path)
 
     @staticmethod
-    @click.command("delete-override", help="Delete a prompt override file")
+    @click.command("delete-override", help="Delete a prompt override file", context_settings={"max_content_width": _MAX_CONTENT_WIDTH})
     @click.argument("prompt_yaml_name")
     def delete_override(prompt_yaml_name: str) -> None:
         """

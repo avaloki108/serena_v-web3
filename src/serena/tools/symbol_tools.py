@@ -3,8 +3,8 @@ Language server-related tools
 """
 
 import dataclasses
-import json
 import os
+from collections import defaultdict
 from collections.abc import Sequence
 from copy import copy
 from typing import Any
@@ -61,7 +61,7 @@ class GetSymbolsOverviewTool(Tool, ToolMarkerSymbolicRead):
         :param max_answer_chars: if the overview is longer than this number of characters,
             no content will be returned. -1 means the default value from the config will be used.
             Don't adjust unless there is really no other way to get the content required for the task.
-        :return: a JSON object containing info about top-level symbols in the file
+        :return: a JSON object containing symbols grouped by kind in a compact format.
         """
         symbol_retriever = self.create_language_server_symbol_retriever()
         file_path = os.path.join(self.project.project_root, relative_path)
@@ -72,75 +72,95 @@ class GetSymbolsOverviewTool(Tool, ToolMarkerSymbolicRead):
             raise FileNotFoundError(f"File or directory {relative_path} does not exist in the project.")
         if os.path.isdir(file_path):
             raise ValueError(f"Expected a file path, but got a directory path: {relative_path}. ")
-        result = symbol_retriever.get_symbol_overview(relative_path)[relative_path]
-        result_json_str = json.dumps([dataclasses.asdict(i) for i in result])
+        result = symbol_retriever.get_symbol_overview(relative_path, depth=depth)[relative_path]
+        # Transform to compact format
+        compact_result = self._transform_symbols_to_compact_format(result)
+        result_json_str = self._to_json(compact_result)
         return self._limit_length(result_json_str, max_answer_chars)
+
+    @staticmethod
+    def _transform_symbols_to_compact_format(symbols: list[dict[str, Any]]) -> dict[str, list]:
+        """
+        Transform symbol overview from verbose format to compact grouped format.
+
+        Groups symbols by kind and uses names instead of full symbol objects.
+        For symbols with children, creates nested dictionaries.
+
+        The name_path can be inferred from the hierarchical structure:
+        - Top-level symbols: name_path = name
+        - Nested symbols: name_path = parent_name + "/" + name
+        For example, "convert" under class "ProjectType" has name_path "ProjectType/convert".
+        """
+        result = defaultdict(list)
+
+        for symbol in symbols:
+            kind = symbol.get("kind", "Unknown")
+            name = symbol.get("name", "unknown")
+            children = symbol.get("children", [])
+
+            if children:
+                # Symbol has children: create nested dict {name: children_dict}
+                children_dict = GetSymbolsOverviewTool._transform_symbols_to_compact_format(children)
+                result[kind].append({name: children_dict})
+            else:
+                # Symbol has no children: just add the name
+                result[kind].append(name)
+
+        return result
 
 
 class FindSymbolTool(Tool, ToolMarkerSymbolicRead):
     """
-    Performs a global (or local) search for symbols with/containing a given name/substring (optionally filtered by type).
+    Performs a global (or local) search using the language server backend.
     """
 
     # noinspection PyDefaultArgument
     def apply(
         self,
-        name_path: str,
+        name_path_pattern: str,
         depth: int = 0,
         relative_path: str = "",
         include_body: bool = False,
+        include_info: bool = True,
         include_kinds: list[int] = [],  # noqa: B006
         exclude_kinds: list[int] = [],  # noqa: B006
         substring_matching: bool = False,
         max_answer_chars: int = -1,
     ) -> str:
         """
-        Retrieves information on all symbols/code entities (classes, methods, etc.) based on the given `name_path`,
-        which represents a pattern for the symbol's path within the symbol tree of a single file.
-        The returned symbol location can be used for edits or further queries.
-        Specify `depth > 0` to retrieve children (e.g., methods of a class).
+        Retrieves information on all symbols/code entities (classes, methods, etc.) based on the given name path pattern.
+        The returned symbol information can be used for edits or further queries.
+        Specify `depth > 0` to also retrieve children/descendants (e.g., methods of a class).
 
-        The matching behavior is determined by the structure of `name_path`, which can
-        either be a simple name (e.g. "method") or a name path like "class/method" (relative name path)
-        or "/class/method" (absolute name path). Note that the name path is not a path in the file system
-        but rather a path in the symbol tree **within a single file**. Thus, file or directory names should never
-        be included in the `name_path`. For restricting the search to a single file or directory,
-        the `within_relative_path` parameter should be used instead. The retrieved symbols' `name_path` attribute
-        will always be composed of symbol names, never file or directory names.
+        A name path is a path in the symbol tree *within a source file*.
+        For example, the method `my_method` defined in class `MyClass` would have the name path `MyClass/my_method`.
+        If a symbol is overloaded (e.g., in Java), a 0-based index is appended (e.g. "MyClass/my_method[0]") to
+        uniquely identify it.
 
-        Key aspects of the name path matching behavior:
-        - Trailing slashes in `name_path` play no role and are ignored.
-        - The name of the retrieved symbols will match (either exactly or as a substring)
-          the last segment of `name_path`, while other segments will restrict the search to symbols that
-          have a desired sequence of ancestors.
-        - If there is no starting or intermediate slash in `name_path`, there is no
-          restriction on the ancestor symbols. For example, passing `method` will match
-          against symbols with name paths like `method`, `class/method`, `class/nested_class/method`, etc.
-        - If `name_path` contains a `/` but doesn't start with a `/`, the matching is restricted to symbols
-          with the same ancestors as the last segment of `name_path`. For example, passing `class/method` will match against
-          `class/method` as well as `nested_class/class/method` but not `method`.
-        - If `name_path` starts with a `/`, it will be treated as an absolute name path pattern, meaning
-          that the first segment of it must match the first segment of the symbol's name path.
-          For example, passing `/class` will match only against top-level symbols like `class` but not against `nested_class/class`.
-          Passing `/class/method` will match against `class/method` but not `nested_class/class/method` or `method`.
+        To search for a symbol, you provide a name path pattern that is used to match against name paths.
+        It can be
+         * a simple name (e.g. "method"), which will match any symbol with that name
+         * a relative path like "class/method", which will match any symbol with that name path suffix
+         * an absolute name path "/class/method" (absolute name path), which requires an exact match of the full name path within the source file.
+        Append an index `[i]` to match a specific overload only, e.g. "MyClass/my_method[1]".
 
-
-        :param name_path: The name path pattern to search for, see above for details.
-        :param depth: Depth to retrieve descendants (e.g., 1 for class methods/attributes).
+        :param name_path_pattern: the name path matching pattern (see above)
+        :param depth: depth up to which descendants shall be retrieved (e.g. use 1 to also retrieve immediate children;
+            for the case where the symbol is a class, this will return its methods). Default 0.
         :param relative_path: Optional. Restrict search to this file or directory. If None, searches entire codebase.
             If a directory is passed, the search will be restricted to the files in that directory.
             If a file is passed, the search will be restricted to that file.
             If you have some knowledge about the codebase, you should use this parameter, as it will significantly
             speed up the search as well as reduce the number of results.
-        :param include_body: If True, include the symbol's source code. Use judiciously.
-        :param include_kinds: Optional. List of LSP symbol kind integers to include. (e.g., 5 for Class, 12 for Function).
-            Valid kinds: 1=file, 2=module, 3=namespace, 4=package, 5=class, 6=method, 7=property, 8=field, 9=constructor, 10=enum,
-            11=interface, 12=function, 13=variable, 14=constant, 15=string, 16=number, 17=boolean, 18=array, 19=object,
-            20=key, 21=null, 22=enum member, 23=struct, 24=event, 25=operator, 26=type parameter.
+        :param include_body: whether to include the symbol's source code. Use judiciously.
+        :param include_info: whether to include additional info (hover-like, typically including docstring and signature),
+            about the symbol (ignored if include_body is True). Default True, info is never included for child symbols.
+        :param include_kinds: List of LSP symbol kind integers to include.
             If not provided, all kinds are included.
         :param exclude_kinds: Optional. List of LSP symbol kind integers to exclude. Takes precedence over `include_kinds`.
             If not provided, no kinds are excluded.
-        :param substring_matching: If True, use substring matching for the last segment of `name`.
+        :param substring_matching: If True, use substring matching for the last element of the pattern, such that
+            "Foo/get" would match "Foo/getValue" and "Foo/getData".
         :param max_answer_chars: Max characters for the JSON result. If exceeded, no content is returned.
             -1 means the default value from the config will be used.
         :return: a list of symbols (with locations) matching the name.
@@ -149,21 +169,26 @@ class FindSymbolTool(Tool, ToolMarkerSymbolicRead):
         parsed_exclude_kinds: Sequence[SymbolKind] | None = [SymbolKind(k) for k in exclude_kinds] if exclude_kinds else None
         symbol_retriever = self.create_language_server_symbol_retriever()
         symbols = symbol_retriever.find_by_name(
-            name_path,
-            include_body=include_body,
+            name_path_pattern,
             include_kinds=parsed_include_kinds,
             exclude_kinds=parsed_exclude_kinds,
             substring_matching=substring_matching,
             within_relative_path=relative_path,
         )
         symbol_dicts = [_sanitize_symbol_dict(s.to_dict(kind=True, location=True, depth=depth, include_body=include_body)) for s in symbols]
-        result = json.dumps(symbol_dicts)
+        if not include_body and include_info:
+            # we add an info field to the symbol dicts if requested
+            for s, s_dict in zip(symbols, symbol_dicts, strict=True):
+                if symbol_info := symbol_retriever.request_info_for_symbol(s):
+                    s_dict["info"] = symbol_info
+                s_dict.pop("name", None)  # name is included in the info
+        result = self._to_json(symbol_dicts)
         return self._limit_length(result, max_answer_chars)
 
 
 class FindReferencingSymbolsTool(Tool, ToolMarkerSymbolicRead):
     """
-    Finds symbols that reference the symbol at the given location (optionally filtered by type).
+    Finds symbols that reference the given symbol using the language server backend
     """
 
     # noinspection PyDefaultArgument
@@ -171,6 +196,7 @@ class FindReferencingSymbolsTool(Tool, ToolMarkerSymbolicRead):
         self,
         name_path: str,
         relative_path: str,
+        include_info: bool = True,
         include_kinds: list[int] = [],  # noqa: B006
         exclude_kinds: list[int] = [],  # noqa: B006
         max_answer_chars: int = -1,
@@ -182,6 +208,8 @@ class FindReferencingSymbolsTool(Tool, ToolMarkerSymbolicRead):
         :param name_path: for finding the symbol to find references for, same logic as in the `find_symbol` tool.
         :param relative_path: the relative path to the file containing the symbol for which to find references.
             Note that here you can't pass a directory but must pass a file.
+        :param include_info: whether to include additional info (hover-like, typically including docstring and signature),
+            about the referencing symbols. Default True.
         :param include_kinds: same as in the `find_symbol` tool.
         :param exclude_kinds: same as in the `find_symbol` tool.
         :param max_answer_chars: same as in the `find_symbol` tool.
@@ -205,18 +233,20 @@ class FindReferencingSymbolsTool(Tool, ToolMarkerSymbolicRead):
             if not include_body:
                 ref_relative_path = ref.symbol.location.relative_path
                 assert ref_relative_path is not None, f"Referencing symbol {ref.symbol.name} has no relative path, this is likely a bug."
+                if include_info and (referencing_symbol_info := symbol_retriever.request_info_for_symbol(ref.symbol)):
+                    ref_dict["info"] = referencing_symbol_info
                 content_around_ref = self.project.retrieve_content_around_line(
                     relative_file_path=ref_relative_path, line=ref.line, context_lines_before=1, context_lines_after=1
                 )
                 ref_dict["content_around_reference"] = content_around_ref.to_display_string()
             reference_dicts.append(ref_dict)
-        result = json.dumps(reference_dicts)
+        result = self._to_json(reference_dicts)
         return self._limit_length(result, max_answer_chars)
 
 
 class ReplaceSymbolBodyTool(Tool, ToolMarkerSymbolicEdit):
     """
-    Replaces the full definition of a symbol.
+    Replaces the full definition of a symbol using the language server backend.
     """
 
     def apply(
