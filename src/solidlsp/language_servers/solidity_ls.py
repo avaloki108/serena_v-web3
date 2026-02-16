@@ -1,5 +1,5 @@
 """
-Provides Solidity specific instantiation of the LanguageServer class using solidity-language-server.
+Provides Solidity specific instantiation of LanguageServer class using solidity-language-server.
 """
 
 import logging
@@ -19,10 +19,9 @@ from solidlsp.settings import SolidLSPSettings
 
 log = logging.getLogger(__name__)
 
-
 class SolidityLanguageServer(SolidLanguageServer):
     """
-    Provides Solidity specific instantiation of the LanguageServer class using Nomicfoundation's solidity-language-server.
+    Provides Solidity specific instantiation of LanguageServer class using Nomicfoundation's solidity-language-server.
     """
 
     @override
@@ -74,6 +73,41 @@ class SolidityLanguageServer(SolidLanguageServer):
 
         return None
 
+    @staticmethod
+    def _setup_runtime_dependency():
+        """
+        Check if required Solidity language server dependencies are available.
+        Raises RuntimeError with helpful message if dependencies are missing.
+        """
+        node_version = SolidityLanguageServer._check_node_available()
+        if not node_version:
+            raise RuntimeError(
+                "Node.js is not installed. Please install Node.js from https://nodejs.org/ "
+                "and make sure it is added to your PATH. The Solidity language server requires Node.js to run."
+            )
+
+        npm_version = SolidityLanguageServer._check_npm_available()
+        if not npm_version:
+            raise RuntimeError(
+                "npm is not installed. Please install npm (usually comes with Node.js) from https://nodejs.org/ "
+                "and make sure it is added to your PATH."
+            )
+
+        log.info(f"Node.js version: {node_version}")
+        log.info(f"npm version: {npm_version}")
+
+        ls_cmd = SolidityLanguageServer._get_solidity_ls_path()
+        if not ls_cmd:
+            raise RuntimeError(
+                "Solidity language server not found.\n"
+                "Please install it globally with:\n"
+                "  npm install -g @nomicfoundation/solidity-language-server\n\n"
+                "Or ensure 'npx' is available (comes with npm 5.2+) to use the server automatically."
+            )
+
+        log.info(f"Using Solidity language server: {' '.join(ls_cmd)}")
+        return ls_cmd
+
     def __init__(
         self,
         config: LanguageServerConfig,
@@ -84,14 +118,7 @@ class SolidityLanguageServer(SolidLanguageServer):
         Creates a SolidityLanguageServer instance. This class is not meant to be instantiated directly.
         Use LanguageServer.create() instead.
         """
-        ls_cmd = self._get_solidity_ls_path()
-        if not ls_cmd:
-            raise RuntimeError(
-                "Solidity language server not found.\n"
-                "Please install it globally with:\n"
-                "  npm install -g @nomicfoundation/solidity-language-server\n\n"
-                "Or ensure 'npx' is available (comes with npm 5.2+) to use the server automatically."
-            )
+        ls_cmd = self._setup_runtime_dependency()
 
         super().__init__(
             config,
@@ -147,7 +174,7 @@ class SolidityLanguageServer(SolidLanguageServer):
             return
 
         def window_log_message(msg):
-            log.info(f"LSP: window/logMessage: {msg}")
+            self.logger.log(f"LSP: window/logMessage: {msg}", logging.INFO)
 
         def do_nothing(params):
             return
@@ -161,7 +188,9 @@ class SolidityLanguageServer(SolidLanguageServer):
         self.server.start()
         initialize_params = self._get_initialize_params(self.repository_root_path)
 
-        log.info("Sending initialize request from LSP client to LSP server and awaiting response")
+        log.info(
+            "Sending initialize request from LSP client to LSP server and awaiting response",
+        )
         init_response = self.server.send.initialize(initialize_params)
 
         # Verify server capabilities

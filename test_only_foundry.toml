@@ -1,0 +1,10 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+fs_permissions = [{ access = "read-write", path = "./" }]
+evm_version = "cancun"
+via_ir = true
+solc_version = "0.8.28"
+test = "test"
+# Only compile our tests and src
